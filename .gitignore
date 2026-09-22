@@ -62,3 +62,6 @@ ios/
 .DS_Store
 Thumbs.db
 ~$*
+
+# --- PWA dev artefacts ---
+dev-dist/

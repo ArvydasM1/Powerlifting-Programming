@@ -873,7 +873,7 @@ Anchor uses the same layout but every "Five" block is 5×5@85.
 
 ### A6. God is a Beast (4 lift blocks/week; Leaders 6 weeks ×2, Anchor 3 weeks)
 - Leader odd weeks: two 5-rep waves per lift — wk1 `70/80/90, 75/85/95 ×5`; wk3 `65/75/85, 70/80/90 ×5`; wk5 `70/80/90, 80/90/100×1-3`.
-- Leader even weeks: volume — 9×5 at 65 % (wk2), 70 % (wk4), 75 % (wk6). Boostcamp shows **10×5**; the workbook has 9 rows (Appendix B). Seed 10×5.
+- Leader even weeks: volume — 10×5 at 65 % (wk2), 70 % (wk4), 75 % (wk6), matching both the workbook and Boostcamp.
 - Within a week each lift alternates: two lifts do the wave while the other two do the volume sets, then swap.
 - Anchor (+2), 3 weeks, two halves per week. First half: Squat and Press do a 3-rep double wave (wk1 `70/80/90+, 75/85/95+ ×3`; wk2 `65/75/85, 70/80/90+ ×3`; wk3 `70/80/90+, 80/90/100×1-3+`) while Bench and Deadlift do 5×5 (65 % wk1, 70 % wk2, 75 % wk3). Second half swaps.
 - Offsets: Leader 1 +0, Leader 2 +1 (after the full 6 weeks), Anchor +2.
@@ -899,7 +899,7 @@ The app follows §6.2 and Appendix A; these are recorded so the regression fixtu
 | `Krypteia` (whole sheet) | Deviates from the book: 4 days and 5×5 FSL in every part, Press kept in Parts 2–3, custom DB supersets, offsets +0/+1/+2/+3 then base TM from Week 12, and "7th Week" blocks that are copies of Week 1. Superseded by the book layout in A1; not used as a fixture. |
 | `FBBBB` Leader 2 and Anchor | No TM increase in any formula. |
 | `Coffinworm` Leader 2 and Anchor | No TM increase in any formula. |
-| `God is a Beast` volume weeks | 9 sets of 5; template is 10 sets of 5. |
+| `Five and Dime`, `Leviathan`, `Pervertor`, `God is a Beast` (Leader 2 and Anchor) | The cycle increase is added to the **weight** (`MROUND(TM×pct + Increase)`), not to the TM before the percentage as the book does. The difference is up to one rounding step per set (e.g. Five and Dime Leader 2 bench 65/75 in the sheet vs 62.5/72.5 from `(TM+2.5)×pct`). `Krypteia` uses the correct `(TM+Increase)×pct`. The app follows the book (§6.2). |
 | `Pervertor` C-wave supplemental | 5×5 at FSL; book says SSL. |
 | `Pervertor!Q62` | `TRMDeadlift*0.85++IncreaseDeadlift` (double plus; evaluates correctly by luck). |
 | `Pervertor!Q71:Q73` | Press sets add `IncreaseBench` instead of `IncreasePress`. |
