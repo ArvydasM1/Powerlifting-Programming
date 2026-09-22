@@ -15,7 +15,7 @@
     "isolatedModules": true,
     "skipLibCheck": true,
     "noEmit": true,
-    "types": ["vite/client", "vitest/globals"],
+    "types": ["vite/client", "vitest/globals", "vite-plugin-pwa/client"],
     "paths": { "@/*": ["./src/*"] }
   },
   "include": ["src", "templates", "test", "vite.config.ts", "capacitor.config.ts"]
