@@ -8,7 +8,8 @@
     "build": "tsc -p tsconfig.json && vite build",
     "preview": "vite preview",
     "typecheck": "tsc -p tsconfig.json",
-    "cap:sync": "cap sync android"
+    "cap:sync": "cap sync android",
+    "setup-hooks": "sh scripts/setup-hooks.sh"
   },
   "keywords": [],
   "author": "",
