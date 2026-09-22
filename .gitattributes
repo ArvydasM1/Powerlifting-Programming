@@ -1,3 +1,4 @@
 * text=auto eol=lf
 *.png binary
 *.jks binary
+*.bat text eol=crlf
