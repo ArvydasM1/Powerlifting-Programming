@@ -1,0 +1,64 @@
+# --- Secrets: never commit ---------------------------------------------------
+.env
+.env.*
+!.env.example
+*.pem
+*.p12
+*.pfx
+*.key
+secrets/
+**/secrets.*
+
+# --- Android signing and local machine config -------------------------------
+*.jks
+*.keystore
+key.properties
+keystore.properties
+signing.properties
+local.properties
+google-services.json
+
+# --- Personal training and health data --------------------------------------
+# The source spreadsheet stays local; committed templates are derived from it.
+*.xlsx
+*.xlsm
+*.xls
+# App exports, backups, AI analysis bundles and reports
+exports/
+backups/
+backup*.json
+*-backup.json
+*.export.json
+analysis/out/
+analysis/*.json
+report*.json
+bundle*.json
+# Captured device data
+*.logcat
+*.logcat.txt
+healthconnect-*.json
+vitals-*.json
+
+# --- Build output and dependencies ------------------------------------------
+node_modules/
+dist/
+build/
+.vite/
+coverage/
+android/app/build/
+android/build/
+android/.gradle/
+android/app/release/
+android/app/debug/
+android/capacitor-cordova-android-plugins/
+ios/
+*.apk
+*.aab
+
+# --- Editors and OS ---------------------------------------------------------
+.vscode/
+.idea/
+*.iml
+.DS_Store
+Thumbs.db
+~$*
