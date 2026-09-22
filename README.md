@@ -28,8 +28,10 @@ npx cap open android     # build and run from Android Studio, or:
 cd android && ./gradlew assembleDebug
 ```
 
-The in-house plugins (rest alert, later Bluetooth heart rate and Health Connect) live under `native/`
-and are copied into the Android project by `cap sync`. See SPEC.md §10.3.
+The in-house plugins (rest alert now; Bluetooth heart rate and Health Connect later) live in
+`android/app/src/main/java/com/arvydas/fivethreeone/` and are registered in `MainActivity`. The
+`android/` project is committed; `cap sync` refreshes its web assets and plugin list. See SPEC.md §10.3.
+The Android build has not yet been run on a machine with the SDK; the first build is the check.
 
 Never commit signing keys, `local.properties`, backups or exports. `.gitignore` covers them; the
 pre-commit hook below and CI both run gitleaks (SPEC.md §16).
@@ -39,6 +41,21 @@ pre-commit hook below and CI both run gitleaks (SPEC.md §16).
 ```bash
 npm run setup-hooks   # installs the gitleaks pre-commit hook (needs gitleaks on PATH)
 ```
+
+## Status
+
+| Area (SPEC.md) | State |
+|---|---|
+| §5–6 domain model and calculation rules | done, unit-tested |
+| Appendix A templates (all seven) and 7th-week protocols | done, fixtures from the workbook |
+| F1 Setup, F2 Start programme (incl. start-at), F3 Today | done |
+| F4 Log session, F10 passive rest timer | done (web alert while visible; native alert via RestAlert plugin) |
+| F5 7th week and TM review | done |
+| F6 Progress, F7 History, Templates | done |
+| F8 workbook import (Parameters, Progress), F9 backup/CSV | done |
+| F11 backfill | "done as prescribed" and clear; workbook and CSV backfill not yet |
+| §10 Capacitor Android shell, RestAlert plugin | scaffolded and written; not yet built (no SDK on the dev machine) |
+| §12 Health Connect, §13 Bluetooth heart rate, §14 sharing UI, §15 AI analysis | not started |
 
 ## Data
 
