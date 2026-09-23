@@ -74,12 +74,16 @@ export interface GuardedTM {
   clamped: boolean;
 }
 
-/** TM proposals outside ±10 % of the current TM are struck through and the current TM is used. */
+/**
+ * TM proposals outside ±10 % of the current TM are struck through and the current TM is used.
+ * With no current TM (fresh install) there is no baseline, so the proposal is used as given.
+ */
 export function guardTM(proposal: LiftMap<number>, current: LiftMap<number>, step: number): GuardedTM[] {
   return LIFTS.map((lift) => {
     const cur = current[lift];
     const p = proposal[lift];
-    const ok = cur > 0 && Math.abs(p - cur) <= cur * 0.1;
+    if (!(cur > 0)) return { lift, proposed: p, used: roundToStep(Math.max(0, p), step), clamped: false };
+    const ok = Math.abs(p - cur) <= cur * 0.1;
     return { lift, proposed: p, used: ok ? roundToStep(p, step) : cur, clamped: !ok };
   });
 }

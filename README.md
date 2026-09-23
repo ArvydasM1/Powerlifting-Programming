@@ -53,9 +53,14 @@ npm run setup-hooks   # installs the gitleaks pre-commit hook (needs gitleaks on
 | F5 7th week and TM review | done |
 | F6 Progress, F7 History, Templates | done |
 | F8 workbook import (Parameters, Progress), F9 backup/CSV | done |
-| F11 backfill | "done as prescribed" and clear; workbook and CSV backfill not yet |
-| §10 Capacitor Android shell, RestAlert plugin | scaffolded and written; not yet built (no SDK on the dev machine) |
-| §12 Health Connect, §13 Bluetooth heart rate, §14 sharing UI, §15 AI analysis | not started |
+| F11 backfill (as prescribed, from workbook sheet, from CSV) | done, tested against the local workbook |
+| §10 Capacitor Android shell, RestAlert plugin | written; not yet built (no SDK on the dev machine) |
+| §12 Health Connect write/read (Kotlin plugin, sync queue, settings, markers) | written; plugin not yet compiled; library versions to confirm at first build |
+| §13 Bluetooth heart rate (bluetooth-le plugin + keep-alive service, Web Bluetooth fallback) | written; native path not yet run on a device |
+| §14 sharing (session text/PNG, chart PNG, CSV/JSON, health checkbox) | done |
+| §15 AI analysis (four providers, guards, checks, bundle, screen) | done on the web side; live providers not yet exercised against real APIs |
+
+Things that need a device or an API key before they count as verified: RestAlert with the screen off, BLE on the Fitbit Air, Health Connect permissions and records, and a live Gemini or Claude run.
 
 ## Data
 

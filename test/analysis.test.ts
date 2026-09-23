@@ -48,6 +48,11 @@ describe("guards", () => {
     expect(g.find((x) => x.lift === "Squat")).toMatchObject({ clamped: false, used: 150 });
     expect(g.find((x) => x.lift === "Bench")).toMatchObject({ clamped: true, used: 95 });
   });
+  it("uses the proposal as given when there is no current TM", () => {
+    const g = guardTM(validReport.programProposal!.tmProposal, { Squat: 0, Bench: 0, Press: 0, Deadlift: 0 }, 2.5);
+    expect(g.every((x) => !x.clamped)).toBe(true);
+    expect(g.find((x) => x.lift === "Bench")!.used).toBe(120);
+  });
 });
 
 describe("prompt", () => {
