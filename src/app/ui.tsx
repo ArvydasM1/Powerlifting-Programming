@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
 export function Card({ children, className = "" }: { children: ReactNode; className?: string }) {
   return <div className={`card ${className}`}>{children}</div>;
@@ -53,10 +53,36 @@ export function NumberField({
   min?: number;
   help?: string;
 }) {
+  // Keep the typed text locally so the field can be emptied while editing; commit parseable values as they are typed.
+  const [text, setText] = useState(String(value));
+  useEffect(() => {
+    if (Number(text) !== value && !(text === "" && value === 0)) setText(String(value));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value]);
   return (
     <label className="field">
       <span className="field-label">{label}</span>
-      <input type="number" inputMode="decimal" value={value} step={step} min={min} onChange={(e) => onChange(Number(e.target.value))} />
+      <input
+        type="number"
+        inputMode="decimal"
+        value={text}
+        step={step}
+        min={min}
+        onFocus={(e) => e.target.select()}
+        onChange={(e) => {
+          const raw = e.target.value;
+          setText(raw);
+          if (raw === "") return;
+          const n = Number(raw);
+          if (Number.isFinite(n)) onChange(n);
+        }}
+        onBlur={() => {
+          if (text === "") {
+            setText("0");
+            onChange(0);
+          } else setText(String(Number(text)));
+        }}
+      />
       {help && <span className="help">{help}</span>}
     </label>
   );
