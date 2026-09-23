@@ -18,15 +18,18 @@ npm run build      # dist/ (PWA)
 
 ## Android
 
-Requires Android Studio (SDK 34+) and JDK 17 or later.
+Requires Android Studio (its bundled JDK is fine; the project pins Gradle 9.5, which runs on JDK 25).
+`android/local.properties` (git-ignored) must point at the SDK, e.g. `sdk.dir=C:/Users/you/AppData/Local/Android/Sdk`.
 
 ```bash
 npm run build
-npx cap add android      # first time only; creates android/
 npx cap sync android
 npx cap open android     # build and run from Android Studio, or:
-cd android && ./gradlew assembleDebug
+cd android && ./gradlew assembleDebug   # → android/app/build/outputs/apk/debug/app-debug.apk
 ```
+
+From a plain shell set `JAVA_HOME` to Android Studio's `jbr` folder first. Missing SDK platforms and
+the Java 21 toolchain for the Capacitor plugin modules download automatically on the first build.
 
 The in-house plugins (rest alert now; Bluetooth heart rate and Health Connect later) live in
 `android/app/src/main/java/com/arvydas/fivethreeone/` and are registered in `MainActivity`. The
@@ -54,9 +57,9 @@ npm run setup-hooks   # installs the gitleaks pre-commit hook (needs gitleaks on
 | F6 Progress, F7 History, Templates | done |
 | F8 workbook import (Parameters, Progress), F9 backup/CSV | done |
 | F11 backfill (as prescribed, from workbook sheet, from CSV) | done, tested against the local workbook |
-| §10 Capacitor Android shell, RestAlert plugin | written; not yet built (no SDK on the dev machine) |
-| §12 Health Connect write/read (Kotlin plugin, sync queue, settings, markers) | written; plugin not yet compiled; library versions to confirm at first build |
-| §13 Bluetooth heart rate (bluetooth-le plugin + keep-alive service, Web Bluetooth fallback) | written; native path not yet run on a device |
+| §10 Capacitor Android shell, RestAlert plugin | debug APK builds (Gradle 9.5, AGP 8.13, Kotlin 2.2.21); not yet run on a device |
+| §12 Health Connect write/read (Kotlin plugin, sync queue, settings, markers) | compiles against connect-client 1.1.0; not yet run on a device |
+| §13 Bluetooth heart rate (bluetooth-le plugin + keep-alive service, Web Bluetooth fallback) | compiles; native path not yet run on a device |
 | §14 sharing (session text/PNG, chart PNG, CSV/JSON, health checkbox) | done |
 | §15 AI analysis (four providers, guards, checks, bundle, screen) | done on the web side; live providers not yet exercised against real APIs |
 
