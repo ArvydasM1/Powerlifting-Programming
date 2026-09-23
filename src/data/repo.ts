@@ -396,6 +396,111 @@ export function createRepo(db: AppDB = defaultDb, clock: Clock = systemClock) {
     });
   }
 
+  /** Apply matched reps to sets (workbook or CSV). One transaction per session. */
+  async function applyBackfillMatches(matches: Array<{ setId: string; sessionId: string; repsDone: number; weight?: number | null }>, source: "backfillWorkbook" | "backfillCsv"): Promise<number> {
+    const settings = await getSettings();
+    const bySession = new Map<string, typeof matches>();
+    for (const m of matches) bySession.set(m.sessionId, [...(bySession.get(m.sessionId) ?? []), m]);
+    let n = 0;
+    for (const [sessionId, ms] of bySession) {
+      await db.transaction("rw", db.sets, db.sessions, db.prRecords, async () => {
+        const session = await db.sessions.get(sessionId);
+        if (!session) return;
+        for (const m of ms) {
+          const set = await db.sets.get(m.setId);
+          if (!set) continue;
+          const weight = m.weight === undefined ? set.prescribedWeight : m.weight;
+          await db.sets.update(set.id, { actualWeight: weight, actualReps: m.repsDone, completedAt: null, actualRestSec: null, backfilled: true, source });
+          await db.prRecords.where("setId").equals(set.id).delete();
+          if (set.lift && set.blockType === "main" && weight !== null && eligibleForPR(parseRepTarget(set.prescribedReps), m.repsDone)) {
+            await db.prRecords.add({
+              lift: set.lift,
+              date: session.date,
+              ordinal: (await db.prRecords.where("lift").equals(set.lift).count()) + 1,
+              weight,
+              reps: m.repsDone,
+              e1rm: e1rm(weight, m.repsDone, settings.roundingStep),
+              source: "backfill",
+              dateApproximate: session.dateApproximate,
+              setId: set.id,
+            });
+          }
+          n++;
+        }
+        if (session.status === "beforeStart" || session.status === "skipped" || session.status === "planned") {
+          await db.sessions.update(sessionId, { status: "backfilled", date: session.date ?? session.plannedDate });
+        }
+      });
+    }
+    return n;
+  }
+
+  /** CSV rows with no planned set: an extra backfilled session for that date (or extra sets on an existing one). */
+  async function addExtraBackfillSets(programId: string, rows: Array<{ date: string; exerciseId: string; exerciseName: string; weight: number | null; reps: number }>): Promise<void> {
+    if (rows.length === 0) return;
+    await db.transaction("rw", db.sessions, db.setGroups, db.sets, async () => {
+      const byDate = new Map<string, typeof rows>();
+      for (const r of rows) byDate.set(r.date, [...(byDate.get(r.date) ?? []), r]);
+      for (const [date, rs] of byDate) {
+        let session = (await db.sessions.where("date").equals(date).toArray()).find((s) => s.programId === programId && s.status === "backfilled");
+        if (!session) {
+          session = {
+            id: crypto.randomUUID(),
+            programId,
+            phaseIndex: -1,
+            weekIndex: 0,
+            sessionIndex: 0,
+            ordinal: -1,
+            phaseName: "Extra",
+            phaseKind: "leader",
+            plannedLabel: `Extra · ${date} · Imported`,
+            tm: { Squat: 0, Bench: 0, Press: 0, Deadlift: 0 },
+            date,
+            plannedDate: date,
+            dateApproximate: false,
+            startedAt: null,
+            finishedAt: null,
+            status: "backfilled",
+            notes: "Imported from CSV",
+            warmupTopSet: null,
+          };
+          await db.sessions.add(session);
+        }
+        const existing = await db.sets.where("sessionId").equals(session.id).count();
+        const groupId = crypto.randomUUID();
+        await db.setGroups.add({ id: groupId, sessionId: session.id, order: 99, type: "main", label: "Imported sets", exerciseId: rs[0]!.exerciseId, exerciseName: rs[0]!.exerciseName, optional: false, superset: false });
+        let i = 0;
+        for (const r of rs) {
+          const lift = (LIFTS as readonly string[]).includes(r.exerciseId) ? (r.exerciseId as Lift) : undefined;
+          await db.sets.add({
+            id: crypto.randomUUID(),
+            sessionId: session.id,
+            groupId,
+            order: existing + i,
+            groupOrder: i,
+            exerciseId: r.exerciseId,
+            exerciseName: r.exerciseName,
+            lift,
+            blockType: lift ? "main" : "assistance",
+            prescribedWeight: r.weight,
+            prescribedReps: String(r.reps),
+            actualWeight: r.weight,
+            actualReps: r.reps,
+            optional: false,
+            isRepPR: false,
+            isE1rmPR: false,
+            plannedRestSec: 0,
+            actualRestSec: null,
+            completedAt: null,
+            backfilled: true,
+            source: "backfillCsv",
+          });
+          i++;
+        }
+      }
+    });
+  }
+
   async function clearBackfill(sessionId: string): Promise<void> {
     await db.transaction("rw", db.sets, db.sessions, db.prRecords, async () => {
       const sets = await sessionSets(sessionId);
@@ -446,6 +551,8 @@ export function createRepo(db: AppDB = defaultDb, clock: Clock = systemClock) {
     abandonProgram,
     proposeEndOfProgramTM,
     backfillAsPrescribed,
+    applyBackfillMatches,
+    addExtraBackfillSets,
     clearBackfill,
     importPRList,
     prHistory,

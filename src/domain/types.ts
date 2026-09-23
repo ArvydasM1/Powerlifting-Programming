@@ -171,3 +171,52 @@ export interface LifterNote {
   date: string;
   text: string;
 }
+
+/** §12.9 / §13: per-session wearable data. One row per session. */
+export interface SessionVitals {
+  sessionId: string;
+  /** "ble:<device>" for live capture, package name for Health Connect */
+  hrSource: string | null;
+  hrAvg: number | null;
+  hrMax: number | null;
+  /** 1 Hz (BLE) or as delivered (Health Connect): [epochMs, bpm] */
+  samples: Array<[number, number]>;
+  perSet: Array<{ setId: string; hrAtDone: number | null; hrMinBeforeNext: number | null; recoveryBpm: number | null }>;
+  restingHr: number | null;
+  hrvRmssd: number | null;
+  sleepMinutes: number | null;
+  sleepStages: Record<string, number> | null;
+  readAt: string | null;
+  /** read attempts for the Health Connect job (§12.9 retry for 48 h) */
+  attempts: number;
+}
+
+/** §12.4: Health Connect write/read jobs */
+export interface SyncJob {
+  id?: number;
+  sessionId: string;
+  kind: "write" | "delete" | "read";
+  status: "queued" | "done" | "failed";
+  createdAt: string;
+  lastTriedAt: string | null;
+  error: string | null;
+}
+
+/** §15.7: one AI analysis run */
+export interface AnalysisRun {
+  id: string;
+  date: string;
+  provider: "share" | "gemini-free" | "claude-code" | "anthropic-api";
+  model: string | null;
+  promptKind: "full" | "nextProgram" | "reviewBlock";
+  inputTokens: number | null;
+  outputTokens: number | null;
+  costUsd: number | null;
+  bundleHash: string;
+  includedHealth: boolean;
+  includedNotes: boolean;
+  report: unknown;
+  status: "ok" | "invalid" | "pending";
+  error: string | null;
+  acceptedProposals: string[];
+}

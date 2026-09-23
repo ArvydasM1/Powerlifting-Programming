@@ -3,8 +3,10 @@ import { useNavigate, useParams } from "react-router-dom";
 import { parseRepTarget, warmupSets, formatRest } from "@/domain/calc";
 import type { SetGroup, WorkoutSet } from "@/domain/types";
 import { keepAwake } from "@/native/bridge";
-import { repo, useSessionData, useSettings } from "../hooks";
+import { sessionText, shareFileName, textToPngBlob } from "@/data/share";
+import { repo, useSessionData, useSessionVitals, useSettings } from "../hooks";
 import { RestBar } from "../RestBar";
+import { ShareDialog } from "../ShareDialog";
 import { Button, Card, Stepper } from "../ui";
 
 export function SessionScreen() {
@@ -15,6 +17,8 @@ export function SessionScreen() {
   const [editing, setEditing] = useState<string | null>(null);
   const [showWarmup, setShowWarmup] = useState(false);
   const [openOptional, setOpenOptional] = useState<Record<string, boolean>>({});
+  const [share, setShare] = useState(false);
+  const vitals = useSessionVitals(id);
   const [, tick] = useState(0);
 
   const live = data?.session.status === "inProgress" || data?.session.status === "planned";
@@ -197,6 +201,32 @@ export function SessionScreen() {
         <Button kind="ghost" onClick={() => repo.clearBackfill(session.id)}>
           Clear backfill
         </Button>
+      )}
+      {readOnly && (session.status === "done" || session.status === "backfilled") && (
+        share ? (
+          <ShareDialog
+            title="session"
+            onClose={() => setShare(false)}
+            items={[
+              {
+                label: "Text summary",
+                filename: shareFileName(session.phaseName, session.date ?? "undated", "session", "txt"),
+                mime: "text/plain",
+                health: true,
+                build: async (h) => sessionText(session, groups, sets, vitals ?? null, { includeHealth: h }),
+              },
+              {
+                label: "Image card",
+                filename: shareFileName(session.phaseName, session.date ?? "undated", "session", "png"),
+                mime: "image/png",
+                health: true,
+                build: async (h) => textToPngBlob(session.plannedLabel.split(" · ").slice(-1)[0] ?? "Session", sessionText(session, groups, sets, vitals ?? null, { includeHealth: h })),
+              },
+            ]}
+          />
+        ) : (
+          <Button onClick={() => setShare(true)}>Share…</Button>
+        )
       )}
     </div>
   );

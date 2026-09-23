@@ -42,6 +42,10 @@ export function useSessionData(sessionId: string | undefined) {
   }, [sessionId]);
 }
 
+export function useSessionVitals(sessionId: string | undefined) {
+  return useLiveQuery(async () => (sessionId ? ((await repo.db.sessionVitals.get(sessionId)) ?? null) : null), [sessionId]);
+}
+
 export function useExercises() {
   return useLiveQuery(() => repo.db.exercises.toArray(), []);
 }

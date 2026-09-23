@@ -1,12 +1,17 @@
+import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { programJson, sessionsCsv, shareFileName } from "@/data/share";
 import { LIFTS } from "@/domain/types";
+import { BackfillCard } from "../BackfillCard";
 import { repo, useActiveProgram, useProgramSessions } from "../hooks";
+import { ShareDialog } from "../ShareDialog";
 import { Button, Card } from "../ui";
 
 export function ProgramScreen() {
   const program = useActiveProgram();
   const sessions = useProgramSessions(program?.id);
   const nav = useNavigate();
+  const [share, setShare] = useState(false);
   if (program === undefined) return <div className="screen">Loading…</div>;
   if (!program)
     return (
@@ -55,6 +60,39 @@ export function ProgramScreen() {
           ))}
         </div>
       ))}
+      {sessions && sessions.some((s) => s.status === "beforeStart" || s.status === "skipped") && <BackfillCard program={program} sessions={sessions} />}
+      {share ? (
+        <ShareDialog
+          title="programme"
+          onClose={() => setShare(false)}
+          items={[
+            {
+              label: "Programme as JSON",
+              filename: shareFileName(program.templateName, program.startDate, "programme", "json"),
+              mime: "application/json",
+              health: true,
+              build: async (h) => {
+                const ss = sessions ?? [];
+                const ids = ss.map((s) => s.id);
+                const [groups, sets, vitals] = await Promise.all([
+                  repo.db.setGroups.where("sessionId").anyOf(ids).toArray(),
+                  repo.db.sets.where("sessionId").anyOf(ids).toArray(),
+                  repo.db.sessionVitals.where("sessionId").anyOf(ids).toArray(),
+                ]);
+                return programJson(program, ss, groups, sets, vitals, { includeHealth: h });
+              },
+            },
+            {
+              label: "Sets as CSV",
+              filename: shareFileName(program.templateName, program.startDate, "sets", "csv"),
+              mime: "text/csv",
+              build: async () => sessionsCsv(sessions ?? [], await repo.db.sets.where("sessionId").anyOf((sessions ?? []).map((s) => s.id)).toArray()),
+            },
+          ]}
+        />
+      ) : (
+        <Button onClick={() => setShare(true)}>Share…</Button>
+      )}
       <Card>
         <Button kind="danger" onClick={async () => { if (confirm("Abandon this programme? Logged sessions are kept.")) { await repo.abandonProgram(program.id); nav("/"); } }}>
           Abandon programme
