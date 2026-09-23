@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import { exportBackup, importBackup, setsToCsv } from "@/data/backup";
 import { parseWorkbook, type WorkbookImport } from "@/data/workbookImport";
 import { LIFTS, type LiftMap, type Settings } from "@/domain/types";
 import { shareOrDownload } from "@/native/bridge";
+import { AnalysisSettingsCard } from "../AnalysisSettingsCard";
 import { HealthConnectCard } from "../HealthConnectCard";
 import { repo, useCurrentTM, useSettings } from "../hooks";
 import { Button, Card, NumberField, Toggle } from "../ui";
@@ -68,6 +70,9 @@ export function SettingsScreen() {
   return (
     <div className="screen">
       <h1>Settings</h1>
+      <p className="small">
+        <Link to="/templates">Browse the templates</Link>
+      </p>
       {msg && <div className="banner">{msg}</div>}
 
       <Card>
@@ -116,6 +121,7 @@ export function SettingsScreen() {
       </Card>
 
       <HealthConnectCard settings={settings} />
+      <AnalysisSettingsCard settings={settings} />
 
       <Card>
         <h3>Backup and export</h3>

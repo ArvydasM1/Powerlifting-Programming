@@ -31,6 +31,7 @@ backup*.json
 *.export.json
 analysis/out/
 analysis/*.json
+!analysis/prompts.json
 report*.json
 bundle*.json
 # Captured device data

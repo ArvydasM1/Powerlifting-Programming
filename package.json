@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "typecheck": "tsc -p tsconfig.json",
     "cap:sync": "cap sync android",
-    "setup-hooks": "sh scripts/setup-hooks.sh"
+    "setup-hooks": "sh scripts/setup-hooks.sh",
+    "analysis:prompts": "node scripts/export-prompts.mjs"
   },
   "keywords": [],
   "author": "",

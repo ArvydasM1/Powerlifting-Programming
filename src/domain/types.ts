@@ -36,6 +36,12 @@ export interface Settings {
   e1rmFormula: "wendler";
   defaultRestSec: Record<BlockType | "superset", number>;
   restAlert: "vibrate" | "sound" | "both" | "none";
+  /** §15.2 AI analysis provider and models (Phase 3) */
+  analysis?: {
+    provider: "share" | "gemini-free" | "claude-code" | "anthropic-api";
+    anthropicModel: string;
+    geminiModel: string;
+  };
   /** §12.5 Health Connect (Phase 2); absent on older settings rows */
   healthConnect?: {
     enabled: boolean;

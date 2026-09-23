@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { NavLink, Route, Routes } from "react-router-dom";
 import { runQueue } from "@/data/healthSync";
 import { repo } from "./hooks";
+import { AnalysisScreen } from "./screens/AnalysisScreen";
 import { HistoryScreen } from "./screens/HistoryScreen";
 import { ProgramScreen } from "./screens/ProgramScreen";
 import { ProgressScreen } from "./screens/ProgressScreen";
@@ -34,6 +35,7 @@ export function App() {
         <Route path="/templates" element={<TemplatesScreen />} />
         <Route path="/settings" element={<SettingsScreen />} />
         <Route path="/tm-review" element={<TmReviewScreen />} />
+        <Route path="/analysis" element={<AnalysisScreen />} />
       </Routes>
       <nav className="nav">
         <NavLink to="/" end>
@@ -48,8 +50,8 @@ export function App() {
         <NavLink to="/history">
           <span>☰</span>History
         </NavLink>
-        <NavLink to="/templates">
-          <span>▤</span>Templates
+        <NavLink to="/analysis">
+          <span>✦</span>Analysis
         </NavLink>
         <NavLink to="/settings">
           <span>⚙</span>Settings

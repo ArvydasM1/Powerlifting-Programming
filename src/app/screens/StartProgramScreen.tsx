@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { TEMPLATES } from "../../../templates";
 import { baseTMFromCurrent, tmForPhase } from "@/domain/calc";
 import { isTrainingPhase } from "@/domain/template";
@@ -11,11 +11,13 @@ export function StartProgramScreen() {
   const nav = useNavigate();
   const settings = useSettings();
   const currentTM = useCurrentTM();
-  const [templateId, setTemplateId] = useState(TEMPLATES[0]!.id);
-  const [opts, setOpts] = useState({ includeDeload: true, includeTmTest: true, includeAssistance: true });
+  /** §15.7: a proposal from the Analysis screen pre-fills this form; the lifter still confirms here */
+  const prefill = (useLocation().state ?? null) as { templateId?: string; tm?: LiftMap<number>; options?: { includeDeload: boolean; includeTmTest: boolean; includeAssistance: boolean }; startDate?: string } | null;
+  const [templateId, setTemplateId] = useState(prefill?.templateId && TEMPLATES.some((t) => t.id === prefill.templateId) ? prefill.templateId : TEMPLATES[0]!.id);
+  const [opts, setOpts] = useState(prefill?.options ?? { includeDeload: true, includeTmTest: true, includeAssistance: true });
   const [startAt, setStartAt] = useState<ProgramPointer>({ phaseIndex: 0, weekIndex: 0, sessionIndex: 0 });
-  const [tmNow, setTmNow] = useState<LiftMap<number>>({ Squat: 0, Bench: 0, Press: 0, Deadlift: 0 });
-  const [anchorDate, setAnchorDate] = useState(new Date().toISOString().slice(0, 10));
+  const [tmNow, setTmNow] = useState<LiftMap<number>>(prefill?.tm ?? { Squat: 0, Bench: 0, Press: 0, Deadlift: 0 });
+  const [anchorDate, setAnchorDate] = useState(prefill?.startDate ?? new Date().toISOString().slice(0, 10));
   const [days, setDays] = useState<number[]>([1, 3, 5]);
   const [error, setError] = useState<string | null>(null);
 
@@ -27,11 +29,11 @@ export function StartProgramScreen() {
   const fresh = startAt.phaseIndex === 0 && startAt.weekIndex === 0 && startAt.sessionIndex === 0;
 
   useEffect(() => {
-    if (settings) setOpts({ includeDeload: settings.includeDeloadAfterLeaders, includeTmTest: settings.includeTmTestAtEnd, includeAssistance: settings.includeAssistance });
-  }, [settings]);
+    if (settings && !prefill?.options) setOpts({ includeDeload: settings.includeDeloadAfterLeaders, includeTmTest: settings.includeTmTestAtEnd, includeAssistance: settings.includeAssistance });
+  }, [settings, prefill?.options]);
   useEffect(() => {
-    if (currentTM) setTmNow(currentTM);
-  }, [currentTM]);
+    if (currentTM && !prefill?.tm) setTmNow(currentTM);
+  }, [currentTM, prefill?.tm]);
   useEffect(() => {
     setStartAt({ phaseIndex: 0, weekIndex: 0, sessionIndex: 0 });
     const defaults: Record<number, number[]> = { 3: [1, 3, 5], 4: [1, 2, 4, 5] };
