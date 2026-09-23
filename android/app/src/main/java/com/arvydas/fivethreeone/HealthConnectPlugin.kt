@@ -82,8 +82,9 @@ class HealthConnectPlugin : Plugin() {
         }
     }
 
+    /** Named to avoid clashing with Plugin.requestPermissions from the Capacitor base class. */
     @PluginMethod
-    fun requestPermissions(call: PluginCall) {
+    fun requestHealthPermissions(call: PluginCall) {
         val keys = call.getArray("types")?.toList<String>() ?: emptyList()
         val perms = keys.mapNotNull { permissionFor(it) }.toSet()
         if (perms.isEmpty()) {

@@ -44,7 +44,7 @@ export function HealthConnectCard({ settings }: { settings: Settings }) {
               onClick={async () => {
                 setExplain(false);
                 await save({ enabled: true });
-                const r = await healthConnect.requestPermissions({ types: needed() });
+                const r = await healthConnect.requestHealthPermissions({ types: needed() });
                 setGranted(r.granted);
                 setMsg(r.granted.includes("writeExercise") ? "Health Connect connected." : "Write permission was not granted; sessions will stay queued.");
               }}
@@ -67,7 +67,7 @@ export function HealthConnectCard({ settings }: { settings: Settings }) {
       <div className="row">
         <Button
           onClick={async () => {
-            const r = await healthConnect.requestPermissions({ types: needed() });
+            const r = await healthConnect.requestHealthPermissions({ types: needed() });
             setGranted(r.granted);
           }}
         >

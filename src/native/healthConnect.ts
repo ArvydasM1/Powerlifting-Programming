@@ -14,7 +14,7 @@ export interface HcSegment {
 export interface HealthConnectPlugin {
   isAvailable(): Promise<{ available: boolean; status: "available" | "updateRequired" | "unavailable" }>;
   getGranted(): Promise<{ granted: HcPermission[] }>;
-  requestPermissions(options: { types: HcPermission[] }): Promise<{ granted: HcPermission[] }>;
+  requestHealthPermissions(options: { types: HcPermission[] }): Promise<{ granted: HcPermission[] }>;
   writeSession(options: { clientId: string; startMs: number; endMs: number; title?: string; notes?: string; segments: HcSegment[] }): Promise<void>;
   deleteSession(options: { clientId: string }): Promise<void>;
   readHeartRate(options: { startMs: number; endMs: number }): Promise<{ samples: Array<{ ts: number; bpm: number; source: string }> }>;
@@ -28,7 +28,7 @@ export const healthConnectAvailable = () => hasPlugin("HealthConnect");
 export const healthConnect: HealthConnectPlugin = {
   isAvailable: () => (healthConnectAvailable() ? Native.isAvailable() : Promise.resolve({ available: false, status: "unavailable" })),
   getGranted: () => (healthConnectAvailable() ? Native.getGranted() : Promise.resolve({ granted: [] })),
-  requestPermissions: (o) => (healthConnectAvailable() ? Native.requestPermissions(o) : Promise.resolve({ granted: [] })),
+  requestHealthPermissions: (o) => (healthConnectAvailable() ? Native.requestHealthPermissions(o) : Promise.resolve({ granted: [] })),
   writeSession: (o) => (healthConnectAvailable() ? Native.writeSession(o) : Promise.reject(new Error("Health Connect not available"))),
   deleteSession: (o) => (healthConnectAvailable() ? Native.deleteSession(o) : Promise.reject(new Error("Health Connect not available"))),
   readHeartRate: (o) => (healthConnectAvailable() ? Native.readHeartRate(o) : Promise.resolve({ samples: [] })),
