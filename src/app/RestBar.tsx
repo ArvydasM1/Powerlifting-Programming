@@ -7,7 +7,7 @@ import { formatRest } from "@/domain/calc";
 import { restAlert } from "@/native/bridge";
 import type { Settings, WorkoutSet } from "@/domain/types";
 
-export function RestBar({ lastCompletedAt, nextSet, settings, elapsedSession }: { lastCompletedAt: string | null; nextSet: WorkoutSet | null; settings: Settings; elapsedSession: number | null }) {
+export function RestBar({ lastCompletedAt, nextSet, settings, elapsedSession, bpm }: { lastCompletedAt: string | null; nextSet: WorkoutSet | null; settings: Settings; elapsedSession: number | null; bpm?: number | null }) {
   const [, tick] = useState(0);
   useEffect(() => {
     const t = setInterval(() => tick((n) => n + 1), 500);
@@ -37,7 +37,8 @@ export function RestBar({ lastCompletedAt, nextSet, settings, elapsedSession }: 
     <div className="restbar">
       <div className="row">
         <div className={`time ${over ? "over" : ""}`}>{elapsed === null ? "—:——" : formatRest(elapsed)}</div>
-        <div className="muted small">
+        <div className="muted small" style={{ textAlign: "right" }}>
+          {bpm !== null && bpm !== undefined && <div style={{ color: "#ef4444", fontSize: "1.3rem", fontWeight: 700 }}>♥ {bpm}</div>}
           {elapsedSession !== null && <span>session {formatRest(elapsedSession)}</span>}
         </div>
       </div>

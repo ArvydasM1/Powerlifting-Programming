@@ -4,10 +4,14 @@ import { parseRepTarget, warmupSets, formatRest } from "@/domain/calc";
 import type { SetGroup, WorkoutSet } from "@/domain/types";
 import { keepAwake } from "@/native/bridge";
 import { sessionText, shareFileName, textToPngBlob } from "@/data/share";
+import { recomputePerSet } from "@/data/vitalsStore";
+import { heartRate } from "@/native/heartRate";
+import { HeartRateButton, useLiveHeartRate } from "../HeartRateControl";
 import { repo, useSessionData, useSessionVitals, useSettings } from "../hooks";
 import { RestBar } from "../RestBar";
 import { ShareDialog } from "../ShareDialog";
 import { Button, Card, Stepper } from "../ui";
+import { VitalsCard } from "../VitalsCard";
 
 export function SessionScreen() {
   const { id } = useParams();
@@ -22,6 +26,7 @@ export function SessionScreen() {
   const [, tick] = useState(0);
 
   const live = data?.session.status === "inProgress" || data?.session.status === "planned";
+  const hr = useLiveHeartRate(id, !!live);
   useEffect(() => {
     if (!live) return;
     void keepAwake.on();
@@ -63,14 +68,18 @@ export function SessionScreen() {
 
   const finish = async () => {
     const r = await repo.finishSession(session.id);
+    await hr.flush();
+    await recomputePerSet(repo.db, session.id);
+    if (heartRate.state !== "idle") await heartRate.disconnect().catch(() => {});
     nav(r.programCompleted ? "/tm-review" : "/");
   };
+  const perSet = new Map((vitals?.perSet ?? []).map((p) => [p.setId, p]));
 
   const groupSets = (g: SetGroup) => sets.filter((s) => s.groupId === g.id);
 
   return (
     <div className="screen">
-      {live && <RestBar lastCompletedAt={lastCompletedAt} nextSet={nextSet} settings={settings} elapsedSession={elapsedSession} />}
+      {live && <RestBar lastCompletedAt={lastCompletedAt} nextSet={nextSet} settings={settings} elapsedSession={elapsedSession} bpm={hr.bpm} />}
       <div className="row">
         <div>
           <h1 style={{ marginBottom: 2 }}>{session.plannedLabel.split(" · ").slice(-1)[0]}</h1>
@@ -80,9 +89,12 @@ export function SessionScreen() {
             {session.status === "done" && session.finishedAt && session.startedAt && ` · ${formatRest(Math.floor((Date.parse(session.finishedAt) - Date.parse(session.startedAt)) / 1000))}`}
           </div>
         </div>
-        <Button kind="ghost" onClick={() => setShowWarmup(!showWarmup)}>
-          Warm-up
-        </Button>
+        <div className="row" style={{ gap: 4 }}>
+          {live && <HeartRateButton state={hr.state} />}
+          <Button kind="ghost" onClick={() => setShowWarmup(!showWarmup)}>
+            Warm-up
+          </Button>
+        </div>
       </div>
 
       {showWarmup && (
@@ -144,6 +156,7 @@ export function SessionScreen() {
                         <div className="actual">
                           did {s.actualWeight ?? "—"} × {s.actualReps ?? "—"}
                           {s.actualRestSec !== null && ` · ${formatRest(s.actualRestSec)} since last set`}
+                          {perSet.get(s.id)?.hrAtDone != null && ` · ♥ ${perSet.get(s.id)!.hrAtDone} → ${perSet.get(s.id)!.hrMinBeforeNext ?? "—"}`}
                         </div>
                       )}
                     </div>
@@ -187,6 +200,7 @@ export function SessionScreen() {
           </div>
         </div>
       )}
+      {vitals && !live && <VitalsCard vitals={vitals} sets={sets} />}
       <label className="field" style={{ marginTop: 16 }}>
         <span className="field-label">Notes</span>
         <textarea rows={2} defaultValue={session.notes} onBlur={(e) => repo.updateSessionNotes(session.id, e.target.value)} />

@@ -29,6 +29,12 @@
             android:name=".RestAlertReceiver"
             android:exported="false" />
 
+        <!-- SessionKeepAlive (SPEC.md §13): keeps the BLE heart-rate connection alive with the screen off -->
+        <service
+            android:name=".SessionKeepAliveService"
+            android:exported="false"
+            android:foregroundServiceType="connectedDevice" />
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
@@ -44,4 +50,9 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Bluetooth LE heart rate (§13); the bluetooth-le plugin declares BLUETOOTH_SCAN/CONNECT -->
+    <uses-feature android:name="android.hardware.bluetooth_le" android:required="false" />
 </manifest>
