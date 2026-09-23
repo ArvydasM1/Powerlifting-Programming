@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { Link } from "react-router-dom";
 import { formatRest } from "@/domain/calc";
+import { queueStatus } from "@/data/healthSync";
 import { sessionsCsv, shareFileName } from "@/data/share";
 import { repo } from "../hooks";
 import { ShareDialog } from "../ShareDialog";
@@ -11,6 +12,7 @@ export function HistoryScreen() {
   const [share, setShare] = useState(false);
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
+  const sync = useLiveQuery(() => queueStatus(repo.db), []);
   const rows = useLiveQuery(async () => {
     const sessions = (await repo.db.sessions.where("status").anyOf(["done", "backfilled"]).toArray()).sort((a, b) => (b.date ?? "").localeCompare(a.date ?? "") || b.ordinal - a.ordinal);
     return Promise.all(
@@ -54,6 +56,9 @@ export function HistoryScreen() {
                   <Link to={`/session/${s.id}`}>{s.plannedLabel.split(" · ").slice(-1)[0]}</Link>
                   <div className="muted small">
                     {s.phaseName} {s.status === "backfilled" ? "· backfilled" : ""} {prs ? `· ${prs} PR` : ""}
+                    {sync?.get(s.id) === "done" && " · synced"}
+                    {sync?.get(s.id) === "queued" && " · sync queued"}
+                    {sync?.get(s.id) === "failed" && " · sync failed"}
                   </div>
                 </td>
                 <td className="num">

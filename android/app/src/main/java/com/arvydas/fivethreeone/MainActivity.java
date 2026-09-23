@@ -10,6 +10,7 @@ public class MainActivity extends BridgeActivity {
         // In-house plugins (SPEC.md §10.3) must be registered before the bridge starts.
         registerPlugin(RestAlertPlugin.class);
         registerPlugin(SessionKeepAlivePlugin.class);
+        registerPlugin(HealthConnectPlugin.class);
         super.onCreate(savedInstanceState);
     }
 }

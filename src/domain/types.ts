@@ -36,6 +36,14 @@ export interface Settings {
   e1rmFormula: "wendler";
   defaultRestSec: Record<BlockType | "superset", number>;
   restAlert: "vibrate" | "sound" | "both" | "none";
+  /** §12.5 Health Connect (Phase 2); absent on older settings rows */
+  healthConnect?: {
+    enabled: boolean;
+    readHeartRate: boolean;
+    readReadiness: boolean;
+    readWeight: boolean;
+    preferredSource: string | null;
+  };
 }
 
 export type TrainingMaxSource = "manual" | "tmTest" | "cycleIncrease" | "programEnd" | "import";
@@ -189,6 +197,9 @@ export interface SessionVitals {
   readAt: string | null;
   /** read attempts for the Health Connect job (§12.9 retry for 48 h) */
   attempts: number;
+  /** other Health Connect sources that had samples in the window */
+  otherSources?: string[];
+  weightKg?: number;
 }
 
 /** §12.4: Health Connect write/read jobs */

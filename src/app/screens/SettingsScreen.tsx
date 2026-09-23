@@ -3,6 +3,7 @@ import { exportBackup, importBackup, setsToCsv } from "@/data/backup";
 import { parseWorkbook, type WorkbookImport } from "@/data/workbookImport";
 import { LIFTS, type LiftMap, type Settings } from "@/domain/types";
 import { shareOrDownload } from "@/native/bridge";
+import { HealthConnectCard } from "../HealthConnectCard";
 import { repo, useCurrentTM, useSettings } from "../hooks";
 import { Button, Card, NumberField, Toggle } from "../ui";
 
@@ -113,6 +114,8 @@ export function SettingsScreen() {
           </select>
         </label>
       </Card>
+
+      <HealthConnectCard settings={settings} />
 
       <Card>
         <h3>Backup and export</h3>

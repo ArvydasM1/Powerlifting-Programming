@@ -4,6 +4,7 @@ import { parseRepTarget, warmupSets, formatRest } from "@/domain/calc";
 import type { SetGroup, WorkoutSet } from "@/domain/types";
 import { keepAwake } from "@/native/bridge";
 import { sessionText, shareFileName, textToPngBlob } from "@/data/share";
+import { onSessionFinished, runQueue } from "@/data/healthSync";
 import { recomputePerSet } from "@/data/vitalsStore";
 import { heartRate } from "@/native/heartRate";
 import { HeartRateButton, useLiveHeartRate } from "../HeartRateControl";
@@ -70,6 +71,8 @@ export function SessionScreen() {
     const r = await repo.finishSession(session.id);
     await hr.flush();
     await recomputePerSet(repo.db, session.id);
+    await onSessionFinished(repo.db, settings, session.id);
+    void runQueue(repo.db, settings);
     if (heartRate.state !== "idle") await heartRate.disconnect().catch(() => {});
     nav(r.programCompleted ? "/tm-review" : "/");
   };

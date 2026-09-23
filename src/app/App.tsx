@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { NavLink, Route, Routes } from "react-router-dom";
+import { runQueue } from "@/data/healthSync";
 import { repo } from "./hooks";
 import { HistoryScreen } from "./screens/HistoryScreen";
 import { ProgramScreen } from "./screens/ProgramScreen";
@@ -14,7 +15,11 @@ import { TodayScreen } from "./screens/TodayScreen";
 export function App() {
   const [ready, setReady] = useState(false);
   useEffect(() => {
-    repo.ensureSeeded().then(() => setReady(true));
+    repo.ensureSeeded().then(async () => {
+      setReady(true);
+      // §12.4: drain the Health Connect queue on launch (no-op unless enabled and available)
+      void runQueue(repo.db, await repo.getSettings());
+    });
   }, []);
   if (!ready) return <div className="screen">Loading…</div>;
   return (
