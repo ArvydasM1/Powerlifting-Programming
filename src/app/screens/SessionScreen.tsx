@@ -23,6 +23,7 @@ export function SessionScreen() {
   const [showWarmup, setShowWarmup] = useState(false);
   const [openOptional, setOpenOptional] = useState<Record<string, boolean>>({});
   const [share, setShare] = useState(false);
+  const [logError, setLogError] = useState<string | null>(null);
   const vitals = useSessionVitals(id);
   const [, tick] = useState(0);
 
@@ -54,7 +55,6 @@ export function SessionScreen() {
   const topSet = session.warmupTopSet ?? Math.max(0, ...sets.filter((s) => s.blockType === "main" && s.prescribedWeight !== null).map((s) => s.prescribedWeight!));
   const elapsedSession = session.startedAt && live ? Math.floor((Date.now() - Date.parse(session.startedAt)) / 1000) : null;
 
-  const [logError, setLogError] = useState<string | null>(null);
   const onDone = async (s: WorkoutSet) => {
     if (readOnly) return;
     if (s.completedAt) {
