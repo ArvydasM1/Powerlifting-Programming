@@ -10,8 +10,10 @@ export const hasPlugin = (name: string) => Capacitor.isPluginAvailable(name);
 // ---- RestAlert (in-house, v1) -------------------------------------------------
 
 export interface RestAlertPlugin {
-  schedule(options: { atEpochMs: number; kind: "vibrate" | "sound" | "both" }): Promise<void>;
+  schedule(options: { atEpochMs: number; kind: "vibrate" | "sound" | "both" }): Promise<{ exact?: boolean }>;
   cancel(): Promise<void>;
+  canScheduleExact(): Promise<{ exact: boolean }>;
+  openExactAlarmSettings(): Promise<void>;
 }
 
 const RestAlertNative = registerPlugin<RestAlertPlugin>("RestAlert");
@@ -20,11 +22,29 @@ let webTimer: number | null = null;
 
 export const restAlert = {
   available: () => hasPlugin("RestAlert") || typeof navigator !== "undefined",
+  isNativePlugin: () => hasPlugin("RestAlert"),
+  /** true when exact alarms are permitted; the web build reports true (it has no alarms to permit) */
+  async canScheduleExact(): Promise<boolean> {
+    if (!hasPlugin("RestAlert")) return true;
+    try {
+      return (await RestAlertNative.canScheduleExact()).exact;
+    } catch {
+      return false;
+    }
+  },
+  async openExactAlarmSettings(): Promise<void> {
+    if (hasPlugin("RestAlert")) await RestAlertNative.openExactAlarmSettings().catch(() => {});
+  },
+  /** Never throws: an alert that cannot be scheduled must not break logging. */
   async schedule(atEpochMs: number, kind: "vibrate" | "sound" | "both" | "none"): Promise<void> {
     await this.cancel();
     if (kind === "none") return;
     if (hasPlugin("RestAlert")) {
-      await RestAlertNative.schedule({ atEpochMs, kind });
+      try {
+        await RestAlertNative.schedule({ atEpochMs, kind });
+      } catch (e) {
+        console.warn("RestAlert.schedule failed", e);
+      }
       return;
     }
     // Web fallback: only fires while the page is visible (§9)
@@ -40,7 +60,7 @@ export const restAlert = {
       clearTimeout(webTimer);
       webTimer = null;
     }
-    if (hasPlugin("RestAlert")) await RestAlertNative.cancel();
+    if (hasPlugin("RestAlert")) await RestAlertNative.cancel().catch(() => {});
   },
 };
 

@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { exportBackup, importBackup, setsToCsv } from "@/data/backup";
 import { parseWorkbook, type WorkbookImport } from "@/data/workbookImport";
 import { LIFTS, type LiftMap, type Settings } from "@/domain/types";
-import { shareOrDownload } from "@/native/bridge";
+import { restAlert, shareOrDownload } from "@/native/bridge";
 import { AnalysisSettingsCard } from "../AnalysisSettingsCard";
 import { HealthConnectCard } from "../HealthConnectCard";
 import { repo, useCurrentTM, useSettings } from "../hooks";
@@ -17,10 +17,19 @@ export function SettingsScreen() {
   const [wb, setWb] = useState<WorkbookImport | null>(null);
   const backupInput = useRef<HTMLInputElement>(null);
   const wbInput = useRef<HTMLInputElement>(null);
+  const [exactAlarms, setExactAlarms] = useState<boolean | null>(null);
 
   useEffect(() => {
     if (tm && !draftTM) setDraftTM(tm);
   }, [tm, draftTM]);
+  useEffect(() => {
+    restAlert.canScheduleExact().then(setExactAlarms);
+    const onVisible = () => {
+      if (document.visibilityState === "visible") restAlert.canScheduleExact().then(setExactAlarms);
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, []);
 
   if (!settings || !draftTM) return <div className="screen">Loading…</div>;
   const save = (patch: Partial<Settings>) => repo.saveSettings(patch);
@@ -118,6 +127,14 @@ export function SettingsScreen() {
             <option value="none">none</option>
           </select>
         </label>
+        {restAlert.isNativePlugin() && exactAlarms === false && (
+          <div className="banner small">
+            <p>Android is not allowing exact alarms for this app, so the alert can be a little late when the screen is off.</p>
+            <Button onClick={async () => { await restAlert.openExactAlarmSettings(); setTimeout(() => restAlert.canScheduleExact().then(setExactAlarms), 1500); }}>
+              Allow exact alarms
+            </Button>
+          </div>
+        )}
       </Card>
 
       <HealthConnectCard settings={settings} />

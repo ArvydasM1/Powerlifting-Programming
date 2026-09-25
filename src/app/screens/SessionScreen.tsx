@@ -54,17 +54,23 @@ export function SessionScreen() {
   const topSet = session.warmupTopSet ?? Math.max(0, ...sets.filter((s) => s.blockType === "main" && s.prescribedWeight !== null).map((s) => s.prescribedWeight!));
   const elapsedSession = session.startedAt && live ? Math.floor((Date.now() - Date.parse(session.startedAt)) / 1000) : null;
 
+  const [logError, setLogError] = useState<string | null>(null);
   const onDone = async (s: WorkoutSet) => {
     if (readOnly) return;
     if (s.completedAt) {
       setEditing(editing === s.id ? null : s.id);
       return;
     }
-    const target = parseRepTarget(s.prescribedReps);
-    const needsWeight = s.blockType === "assistance" && s.actualWeight === null;
-    await repo.logSet(s.id, needsWeight ? { actualWeight: (await repo.db.exercises.get(s.exerciseId))?.lastWeight ?? 0 } : {});
-    if (target.amrap || target.max !== null || needsWeight) setEditing(s.id);
-    else setEditing(null);
+    try {
+      const target = parseRepTarget(s.prescribedReps);
+      const needsWeight = s.blockType === "assistance" && s.actualWeight === null;
+      await repo.logSet(s.id, needsWeight ? { actualWeight: (await repo.db.exercises.get(s.exerciseId))?.lastWeight ?? 0 } : {});
+      if (target.amrap || target.max !== null || needsWeight) setEditing(s.id);
+      else setEditing(null);
+      setLogError(null);
+    } catch (e) {
+      setLogError(`Could not save the set: ${(e as Error).message}`);
+    }
   };
 
   const finish = async () => {
@@ -100,6 +106,7 @@ export function SessionScreen() {
         </div>
       </div>
 
+      {logError && <p className="error small">{logError}</p>}
       {showWarmup && (
         <Card>
           <div className="row">
