@@ -1,18 +1,25 @@
 package com.arvydas.fivethreeone;
 
+import android.Manifest;
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.content.pm.ServiceInfo;
 import android.os.Build;
 import android.os.IBinder;
 
 import androidx.core.app.NotificationCompat;
+import androidx.core.content.ContextCompat;
 
-/** Foreground service behind SessionKeepAlivePlugin. Type connectedDevice (Android 14+ requirement). */
+/**
+ * Foreground service behind SessionKeepAlivePlugin. Type connectedDevice, which on Android 14+
+ * may only start while BLUETOOTH_CONNECT is granted. Not sticky: a dead service must not be
+ * restarted by the system without the app asking, and nothing here may throw.
+ */
 public class SessionKeepAliveService extends Service {
 
     static final String EXTRA_TEXT = "text";
@@ -21,14 +28,28 @@ public class SessionKeepAliveService extends Service {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        String text = intent != null ? intent.getStringExtra(EXTRA_TEXT) : null;
-        Notification n = build(text != null ? text : "Session in progress");
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            startForeground(ID, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE);
-        } else {
-            startForeground(ID, n);
+        if (intent == null) {
+            // restarted by the system without a request: do nothing
+            stopSelf();
+            return START_NOT_STICKY;
         }
-        return START_STICKY;
+        try {
+            String text = intent.getStringExtra(EXTRA_TEXT);
+            Notification n = build(text != null ? text : "Session in progress");
+            boolean btGranted = Build.VERSION.SDK_INT < Build.VERSION_CODES.S
+                    || ContextCompat.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && btGranted) {
+                startForeground(ID, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE);
+            } else if (Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                startForeground(ID, n);
+            } else {
+                // Android 14+ requires a type we are not allowed to use yet
+                stopSelf();
+            }
+        } catch (Throwable t) {
+            stopSelf();
+        }
+        return START_NOT_STICKY;
     }
 
     private Notification build(String text) {

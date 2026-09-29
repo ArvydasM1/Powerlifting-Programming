@@ -17,16 +17,28 @@ public class RestAlertReceiver extends BroadcastReceiver {
 
     @Override
     public void onReceive(Context context, Intent intent) {
-        if (intent == null || !RestAlertPlugin.ACTION.equals(intent.getAction())) return;
-        fire(context, intent.getStringExtra(RestAlertPlugin.EXTRA_KIND));
+        try {
+            if (intent == null || !RestAlertPlugin.ACTION.equals(intent.getAction())) return;
+            fire(context, intent.getStringExtra(RestAlertPlugin.EXTRA_KIND));
+        } catch (Throwable ignored) {
+            // an alert that cannot fire must never take the process down
+        }
     }
 
     static void fire(Context ctx, String kind) {
         if (kind == null) kind = "vibrate";
         boolean vibrate = kind.equals("vibrate") || kind.equals("both");
         boolean sound = kind.equals("sound") || kind.equals("both");
-        if (vibrate) vibrate(ctx);
-        if (sound) sound(ctx);
+        try {
+            if (vibrate) vibrate(ctx);
+        } catch (Throwable ignored) {
+            // no vibrator
+        }
+        try {
+            if (sound) sound(ctx);
+        } catch (Throwable ignored) {
+            // no sound
+        }
     }
 
     private static void vibrate(Context ctx) {
