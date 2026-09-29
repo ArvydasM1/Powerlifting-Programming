@@ -483,13 +483,14 @@ One record per completed session, written when the session is finished:
 
 | Health Connect object | Source in our model |
 |---|---|
-| `ExerciseSessionRecord`, type strength training | `Session.startedAt` → `Session.finishedAt`; title = `plannedLabel`; notes = `Session.notes` |
+| `ExerciseSessionRecord`, type strength training | `Session.startedAt` → `Session.finishedAt`; title = `plannedLabel`; notes = weights-and-reps summary (one line per exercise block, e.g. `Press: 40×5, 45×5, 52.5×5` / `Press (supplemental): 5 × 5 @ 40`) followed by `Session.notes` |
 | one `ExerciseSegment` per logged set | `Set.completedAt − (actualRestSec or a fixed 30 s for the first set)` → `Set.completedAt`; `repetitions = actualReps`; `segmentType` from the exercise map below |
-| client record ID | `Session.id`, so later edits and deletes update or remove the same record |
+| `HeartRateRecord` (only when a Bluetooth sensor was connected, §13) | the live 1 Hz samples inside the session window, in chunks of ≤1000 samples; this app's own earlier heart-rate records in the window are replaced. Samples read from Health Connect are never written back, and read-back ignores this app's own package as a source |
+| client record ID | `Session.id`, so later edits and deletes update or remove the same record; heart-rate records are deleted by time window (an app can only delete its own) |
 
-Segment type map: Squat → squat, Bench → bench press, Deadlift → deadlift, Press → barbell shoulder press. Assistance exercises map to the nearest Health Connect segment type where one exists (dips, pull-ups, lunges, etc.), otherwise to the generic weightlifting/other strength type. The map is a data file next to the exercise catalogue.
+Segment type map: Squat → squat, Bench → bench press, Deadlift → deadlift, Press → barbell shoulder press. Every assistance exercise in the catalogue maps to the nearest `ExerciseSegment` constant of connect-client 1.1.0 (dumbbell presses → bench press, curls → arm curl, SLDL variants → deadlift, good morning/back raise → back extension, glute-ham raise → leg curl, hanging leg raise → leg raise, ab wheel → plank, goblet/DB squat → squat, farmer walk → walking, pull-up variants → pull-up, DB row → dumbbell row, rear laterals → dumbbell lateral raise, triceps extension → two-arm dumbbell triceps extension, plate raise → front raise) and to weightlifting where none fits (dips, push-ups, barbell rows, shrugs, band work, neck). The map lives in `src/native/healthConnect.ts`, keyed by catalogue slug.
 
-Health Connect segments carry **no weight or load field**, so kilos stay in our app only. This reflects the API as understood at spec time and must be re-checked against the current androidx release before implementation; if a load field has been added, write `actualWeight` to it.
+Health Connect segments carry **no weight or load field** (re-checked against connect-client 1.1.0), so kilos exist in Health Connect only as the notes text above. Google Health's workout view shows type, time, source, duration and heart rate; it does not render segments or notes, so per-set detail is stored but visible only to apps that read it.
 
 ### 12.4 Sync behaviour
 

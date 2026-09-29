@@ -45,6 +45,7 @@ class HealthConnectPlugin : Plugin() {
 
     private fun permissionFor(key: String): String? = when (key) {
         "writeExercise" -> HealthPermission.getWritePermission(ExerciseSessionRecord::class)
+        "writeHeartRate" -> HealthPermission.getWritePermission(HeartRateRecord::class)
         "readHeartRate" -> HealthPermission.getReadPermission(HeartRateRecord::class)
         "readRestingHeartRate" -> HealthPermission.getReadPermission(RestingHeartRateRecord::class)
         "readHrv" -> HealthPermission.getReadPermission(HeartRateVariabilityRmssdRecord::class)
@@ -114,6 +115,14 @@ class HealthConnectPlugin : Plugin() {
         "dumbbellRow" -> ExerciseSegment.EXERCISE_SEGMENT_TYPE_DUMBBELL_ROW
         "plank" -> ExerciseSegment.EXERCISE_SEGMENT_TYPE_PLANK
         "sitUp" -> ExerciseSegment.EXERCISE_SEGMENT_TYPE_SIT_UP
+        "armCurl" -> ExerciseSegment.EXERCISE_SEGMENT_TYPE_ARM_CURL
+        "backExtension" -> ExerciseSegment.EXERCISE_SEGMENT_TYPE_BACK_EXTENSION
+        "dumbbellTricepsExtensionTwoArm" -> ExerciseSegment.EXERCISE_SEGMENT_TYPE_DUMBBELL_TRICEPS_EXTENSION_TWO_ARM
+        "frontRaise" -> ExerciseSegment.EXERCISE_SEGMENT_TYPE_FRONT_RAISE
+        "dumbbellLateralRaise" -> ExerciseSegment.EXERCISE_SEGMENT_TYPE_DUMBBELL_LATERAL_RAISE
+        "legCurl" -> ExerciseSegment.EXERCISE_SEGMENT_TYPE_LEG_CURL
+        "legRaise" -> ExerciseSegment.EXERCISE_SEGMENT_TYPE_LEG_RAISE
+        "walking" -> ExerciseSegment.EXERCISE_SEGMENT_TYPE_WALKING
         else -> ExerciseSegment.EXERCISE_SEGMENT_TYPE_WEIGHTLIFTING
     }
 
@@ -181,6 +190,60 @@ class HealthConnectPlugin : Plugin() {
                 call.resolve()
             } catch (e: Throwable) {
                 call.reject("deleteSession: ${e.message ?: e.javaClass.simpleName}")
+            }
+        }
+    }
+
+    @PluginMethod
+    fun writeHeartRate(call: PluginCall) {
+        val start: Instant
+        val end: Instant
+        val zone: ZoneOffset
+        val samples = mutableListOf<HeartRateRecord.Sample>()
+        try {
+            start = Instant.ofEpochMilli(call.getLong("startMs") ?: return call.reject("startMs required"))
+            end = Instant.ofEpochMilli(call.getLong("endMs") ?: return call.reject("endMs required"))
+            zone = ZoneId.systemDefault().rules.getOffset(start)
+            val arr = call.getArray("samples")
+            if (arr != null) {
+                for (i in 0 until arr.length()) {
+                    val s = arr.getJSONObject(i)
+                    val t = Instant.ofEpochMilli(s.getLong("ts"))
+                    val bpm = s.getLong("bpm")
+                    if (t.isBefore(start) || t.isAfter(end) || bpm <= 0) continue
+                    samples.add(HeartRateRecord.Sample(t, bpm))
+                }
+            }
+        } catch (e: Throwable) {
+            return call.reject("writeHeartRate arguments: ${e.message ?: e.javaClass.simpleName}")
+        }
+        if (samples.isEmpty()) return call.resolve()
+        scope.launch {
+            try {
+                val c = client()
+                // Only this app's own records in the window can be deleted this way; other sources are never touched.
+                c.deleteRecords(HeartRateRecord::class, TimeRangeFilter.between(start, end))
+                val sorted = samples.sortedBy { it.time }
+                for (chunk in sorted.chunked(1000)) {
+                    c.insertRecords(listOf(HeartRateRecord(chunk.first().time, zone, chunk.last().time, zone, chunk, Metadata.activelyRecorded(Device(type = Device.TYPE_PHONE)))))
+                }
+                call.resolve()
+            } catch (e: Throwable) {
+                call.reject("writeHeartRate: ${e.message ?: e.javaClass.simpleName}")
+            }
+        }
+    }
+
+    @PluginMethod
+    fun deleteHeartRate(call: PluginCall) {
+        val start = Instant.ofEpochMilli(call.getLong("startMs") ?: return call.reject("startMs required"))
+        val end = Instant.ofEpochMilli(call.getLong("endMs") ?: return call.reject("endMs required"))
+        scope.launch {
+            try {
+                client().deleteRecords(HeartRateRecord::class, TimeRangeFilter.between(start, end))
+                call.resolve()
+            } catch (e: Throwable) {
+                call.reject("deleteHeartRate: ${e.message ?: e.javaClass.simpleName}")
             }
         }
     }

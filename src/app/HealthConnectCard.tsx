@@ -24,7 +24,7 @@ export function HealthConnectCard({ settings }: { settings: Settings }) {
 
   if (!healthConnectAvailable()) return null;
   const save = (patch: Partial<typeof hc>) => repo.saveSettings({ healthConnect: { ...hc, ...patch } });
-  const needed = (): HcPermission[] => ["writeExercise", ...(hc.readHeartRate ? (["readHeartRate"] as HcPermission[]) : []), ...(hc.readReadiness ? (["readRestingHeartRate", "readHrv", "readSleep"] as HcPermission[]) : []), ...(hc.readWeight ? (["readWeight"] as HcPermission[]) : [])];
+  const needed = (): HcPermission[] => ["writeExercise", "writeHeartRate", ...(hc.readHeartRate ? (["readHeartRate"] as HcPermission[]) : []), ...(hc.readReadiness ? (["readRestingHeartRate", "readHrv", "readSleep"] as HcPermission[]) : []), ...(hc.readWeight ? (["readWeight"] as HcPermission[]) : [])];
 
   return (
     <Card>
@@ -33,7 +33,7 @@ export function HealthConnectCard({ settings }: { settings: Settings }) {
         Status: {status} · granted: {granted.length ? granted.join(", ") : "none"} · written {written ?? 0} · queued {queued ?? 0} · failed {failed ?? 0}
       </p>
       {msg && <div className="banner small">{msg}</div>}
-      <Toggle label="Sync finished sessions to Health Connect" checked={hc.enabled} onChange={(v) => (v ? setExplain(true) : save({ enabled: false }))} help="One exercise session per finished session, one segment per set with reps. No weights." />
+      <Toggle label="Sync finished sessions to Health Connect" checked={hc.enabled} onChange={(v) => (v ? setExplain(true) : save({ enabled: false }))} help="One exercise session per finished session: a segment per set with exercise type and reps, weights and reps as notes, and the live Bluetooth heart rate when a sensor was connected." />
       {explain && (
         <div className="banner small">
           <p>

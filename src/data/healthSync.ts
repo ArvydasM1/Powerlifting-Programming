@@ -6,7 +6,7 @@
 import { mergeSamples, emptyVitals } from "./vitalsStore";
 import { perSetRecovery, summarise } from "@/domain/vitals";
 import type { Session, SessionVitals, Settings, SyncJob, WorkoutSet } from "@/domain/types";
-import { healthConnect, healthConnectAvailable, segmentTypeFor } from "@/native/healthConnect";
+import { OWN_PACKAGE, healthConnect, healthConnectAvailable, segmentTypeFor } from "@/native/healthConnect";
 import type { AppDB } from "./db";
 
 export interface HealthConnectSettings {
@@ -67,6 +67,34 @@ export function writeSkipReason(session: Session, sets: WorkoutSet[]): string | 
   return null;
 }
 
+const fmtW = (w: number) => (Number.isInteger(w) ? String(w) : w.toFixed(1).replace(/\.0$/, ""));
+
+/**
+ * Weights and reps as text, one line per exercise block, in logging order. Health Connect has no field
+ * for load, so this goes into the session notes: "Press: 40×5, 45×5, 52.5×5" / "Press (supplemental): 5 × 5 @ 40".
+ */
+export function sessionSummary(sets: WorkoutSet[]): string {
+  const logged = sets.filter((s) => s.completedAt && !s.backfilled).sort((a, b) => Date.parse(a.completedAt!) - Date.parse(b.completedAt!));
+  const groups: Array<{ key: string; name: string; items: Array<{ w: number | null; r: number }> }> = [];
+  for (const s of logged) {
+    let g = groups.find((x) => x.key === s.groupId);
+    if (!g) {
+      g = { key: s.groupId, name: s.blockType === "supplemental" ? `${s.exerciseName} (supplemental)` : s.exerciseName, items: [] };
+      groups.push(g);
+    }
+    g.items.push({ w: s.actualWeight, r: s.actualReps ?? 0 });
+  }
+  return groups
+    .map((g) => {
+      const first = g.items[0]!;
+      const one = (i: { w: number | null; r: number }) => (i.w !== null && i.w > 0 ? `${fmtW(i.w)}×${i.r}` : `${i.r}`);
+      const same = g.items.every((i) => i.w === first.w && i.r === first.r);
+      const body = same && g.items.length > 1 ? `${g.items.length} × ${first.r}${first.w ? ` @ ${fmtW(first.w)}` : ""}` : g.items.map(one).join(", ");
+      return `${g.name}: ${body}`;
+    })
+    .join("\n");
+}
+
 /** Build the Health Connect payload for a session (§12.3). Sessions with at least one logged barbell set qualify. */
 export function buildWritePayload(session: Session, sets: WorkoutSet[]) {
   if (writeSkipReason(session, sets) || !session.startedAt || !session.finishedAt) return null;
@@ -79,7 +107,19 @@ export function buildWritePayload(session: Session, sets: WorkoutSet[]) {
     const segStart = Math.max(prevEnd, endMs - Math.max(10, Math.min(rest, 120)) * 1000);
     return { startMs: segStart, endMs, type: segmentTypeFor(s.exerciseId), reps: s.actualReps ?? 0 };
   });
-  return { clientId: session.id, startMs, endMs: Date.parse(session.finishedAt), title: session.plannedLabel, notes: session.notes || undefined, segments };
+  const notes = [sessionSummary(sets), (session.notes ?? "").trim()].filter(Boolean).join("\n\n");
+  return { clientId: session.id, startMs, endMs: Date.parse(session.finishedAt), title: session.plannedLabel, notes: notes || undefined, segments };
+}
+
+/** Live heart rate captured over Bluetooth during the session, if any (§12.3). Samples read from Health Connect are never written back. */
+export async function liveHeartRatePayload(db: AppDB, session: Session) {
+  if (!session.startedAt || !session.finishedAt) return null;
+  const v = await db.sessionVitals.get(session.id);
+  if (!v || !v.hrSource?.startsWith("ble:") || v.samples.length === 0) return null;
+  const startMs = Date.parse(session.startedAt);
+  const endMs = Date.parse(session.finishedAt);
+  const samples = v.samples.filter(([ts, bpm]) => ts >= startMs && ts <= endMs && bpm > 0).map(([ts, bpm]) => ({ ts, bpm: Math.round(bpm) }));
+  return samples.length ? { startMs, endMs, samples } : null;
 }
 
 /** Run every queued job once. Returns counts for the UI. */
@@ -102,10 +142,14 @@ export async function runQueue(db: AppDB, settings: Settings): Promise<{ done: n
           continue;
         }
         await healthConnect.writeSession(buildWritePayload(session, sets)!);
+        const hr = await liveHeartRatePayload(db, session);
+        if (hr) await healthConnect.writeHeartRate(hr);
         await db.syncQueue.update(job.id!, { status: "done", lastTriedAt: now, error: null });
         result.done++;
       } else if (job.kind === "delete") {
         await healthConnect.deleteSession({ clientId: job.sessionId });
+        const gone = await db.sessions.get(job.sessionId);
+        if (gone?.startedAt && gone.finishedAt) await healthConnect.deleteHeartRate({ startMs: Date.parse(gone.startedAt), endMs: Date.parse(gone.finishedAt) });
         await db.syncQueue.update(job.id!, { status: "done", lastTriedAt: now, error: null });
         result.done++;
       } else {
@@ -140,7 +184,8 @@ export async function readVitals(db: AppDB, hc: HealthConnectSettings, sessionId
   let foundHr = false;
 
   if (hc.readHeartRate) {
-    const { samples } = await healthConnect.readHeartRate({ startMs: start, endMs: end });
+    const all = await healthConnect.readHeartRate({ startMs: start, endMs: end });
+    const samples = all.samples.filter((s) => s.source !== OWN_PACKAGE); // never read back what this app wrote
     if (samples.length > 0) {
       foundHr = true;
       const bySource = new Map<string, Array<[number, number]>>();
