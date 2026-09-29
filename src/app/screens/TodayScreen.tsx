@@ -1,5 +1,6 @@
 import { Link, useNavigate } from "react-router-dom";
 import { LIFTS } from "@/domain/types";
+import { CrashBanner } from "../CrashBanner";
 import { repo, useActiveProgram, useCurrentTM, useNextSession, useSessionData } from "../hooks";
 import { Button, Card } from "../ui";
 
@@ -13,6 +14,7 @@ export function TodayScreen() {
   return (
     <div className="screen">
       <h1>Today</h1>
+      <CrashBanner />
       {tm && (
         <div className="tm-strip">
           {LIFTS.map((l) => (

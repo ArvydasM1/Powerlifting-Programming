@@ -74,13 +74,29 @@ export function SessionScreen() {
   };
 
   const finish = async () => {
-    const r = await repo.finishSession(session.id);
-    await hr.flush();
-    await recomputePerSet(repo.db, session.id);
-    await onSessionFinished(repo.db, settings, session.id);
-    void runQueue(repo.db, settings);
-    if (heartRate.state !== "idle") await heartRate.disconnect().catch(() => {});
-    nav(r.programCompleted ? "/tm-review" : "/");
+    let completed = false;
+    try {
+      completed = (await repo.finishSession(session.id)).programCompleted;
+    } catch (e) {
+      setLogError(`Could not finish the session: ${(e as Error).message}`);
+      return;
+    }
+    // Everything after the save is best-effort; none of it may keep the lifter on this screen.
+    const steps: Array<[string, () => Promise<unknown>]> = [
+      ["heart-rate flush", () => hr.flush()],
+      ["per-set recovery", () => recomputePerSet(repo.db, session.id)],
+      ["health sync", () => onSessionFinished(repo.db, settings, session.id)],
+      ["heart-rate disconnect", () => (heartRate.state !== "idle" ? heartRate.disconnect() : Promise.resolve())],
+    ];
+    for (const [name, step] of steps) {
+      try {
+        await step();
+      } catch (e) {
+        console.warn(`finish: ${name} failed`, e);
+      }
+    }
+    void runQueue(repo.db, settings).catch(() => {});
+    nav(completed ? "/tm-review" : "/");
   };
   const perSet = new Map((vitals?.perSet ?? []).map((p) => [p.setId, p]));
 
