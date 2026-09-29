@@ -5,6 +5,7 @@ import { parseWorkbook, type WorkbookImport } from "@/data/workbookImport";
 import { LIFTS, type LiftMap, type Settings } from "@/domain/types";
 import { restAlert, shareOrDownload } from "@/native/bridge";
 import { AnalysisSettingsCard } from "../AnalysisSettingsCard";
+import { forceRecoveryNextStart } from "../diagnostics";
 import { HealthConnectCard } from "../HealthConnectCard";
 import { repo, useCurrentTM, useSettings } from "../hooks";
 import { Button, Card, NumberField, Toggle } from "../ui";
@@ -149,6 +150,9 @@ export function SettingsScreen() {
           <input ref={backupInput} type="file" accept="application/json" hidden onChange={(e) => onBackupFile(e.target.files?.[0])} />
         </div>
         <p className="help">Backups contain your training data. Keep them outside any public repository.</p>
+        <Button kind="ghost" onClick={() => { forceRecoveryNextStart(true); window.location.reload(); }}>
+          Open recovery mode
+        </Button>
       </Card>
 
       <Card>

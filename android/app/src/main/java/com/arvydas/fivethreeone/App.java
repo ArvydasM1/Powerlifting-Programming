@@ -2,7 +2,7 @@ package com.arvydas.fivethreeone;
 
 import android.app.Application;
 
-/** Installs the crash recorder for every process start (services and receivers included), not just the activity. */
+/** Process-start hooks: crash recorder and the failed-start counter behind recovery mode. */
 public class App extends Application {
     @Override
     public void onCreate() {
@@ -12,5 +12,6 @@ public class App extends Application {
         } catch (Throwable ignored) {
             // recorder is optional
         }
+        SafeModePlugin.onProcessStart(this);
     }
 }

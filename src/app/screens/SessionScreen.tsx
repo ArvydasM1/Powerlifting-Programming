@@ -5,6 +5,7 @@ import type { SetGroup, WorkoutSet } from "@/domain/types";
 import { keepAwake } from "@/native/bridge";
 import { sessionText, shareFileName, textToPngBlob } from "@/data/share";
 import { onSessionFinished, runQueue } from "@/data/healthSync";
+import { crumb } from "../diagnostics";
 import { recomputePerSet } from "@/data/vitalsStore";
 import { heartRate } from "@/native/heartRate";
 import { HeartRateButton, useLiveHeartRate } from "../HeartRateControl";
@@ -75,8 +76,10 @@ export function SessionScreen() {
 
   const finish = async () => {
     let completed = false;
+    crumb("finish: start");
     try {
       completed = (await repo.finishSession(session.id)).programCompleted;
+      crumb("finish: saved");
     } catch (e) {
       setLogError(`Could not finish the session: ${(e as Error).message}`);
       return;
@@ -90,12 +93,14 @@ export function SessionScreen() {
     ];
     for (const [name, step] of steps) {
       try {
+        crumb(`finish: ${name}`);
         await step();
       } catch (e) {
         console.warn(`finish: ${name} failed`, e);
       }
     }
     void runQueue(repo.db, settings).catch(() => {});
+    crumb("finish: navigate");
     nav(completed ? "/tm-review" : "/");
   };
   const perSet = new Map((vitals?.perSet ?? []).map((p) => [p.setId, p]));

@@ -1,4 +1,6 @@
+import { useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { crumb } from "../diagnostics";
 import { LIFTS } from "@/domain/types";
 import { CrashBanner } from "../CrashBanner";
 import { repo, useActiveProgram, useCurrentTM, useNextSession, useSessionData } from "../hooks";
@@ -10,6 +12,9 @@ export function TodayScreen() {
   const next = useNextSession(program?.id);
   const preview = useSessionData(next?.id);
   const nav = useNavigate();
+  useEffect(() => {
+    crumb(`today: program=${program === undefined ? "loading" : program ? "yes" : "none"} next=${next === undefined ? "loading" : next ? next.ordinal : "none"} preview=${preview ? "yes" : "no"}`);
+  }, [program, next, preview]);
 
   return (
     <div className="screen">
