@@ -91,22 +91,73 @@ class HeartRateMonitor {
     } catch {
       /* ignore */
     }
-    if (!id) {
-      const dev = await BleClient.requestDevice({ services: [HR_SERVICE] });
-      id = dev.deviceId;
-      try {
-        localStorage.setItem(this.lastDeviceKey, id);
-      } catch {
-        /* ignore */
-      }
-    }
-    this.deviceId = id;
-    await BleClient.connect(id, () => {
+    const onDisconnect = () => {
       if (this.stopping) return;
       this.setState("reconnecting");
       void this.retryNative();
-    });
-    await BleClient.startNotifications(id, HR_SERVICE, HR_MEASUREMENT, (v) => this.emit(parseHeartRateMeasurement(v)));
+    };
+    const remember = (deviceId: string) => {
+      try {
+        localStorage.setItem(this.lastDeviceKey, deviceId);
+      } catch {
+        /* ignore */
+      }
+      return deviceId;
+    };
+    const pick = async (): Promise<string> => {
+      // 1. A device the phone already holds a link to (Google Health keeps the Fitbit Air connected)
+      //    that exposes the heart-rate service: no advertising needed, Android shares the connection.
+      try {
+        const linked = await BleClient.getConnectedDevices([HR_SERVICE]);
+        if (linked.length === 1) return remember(linked[0]!.deviceId);
+      } catch {
+        /* not supported here */
+      }
+      // 2. Anything advertising the heart-rate service.
+      try {
+        return remember((await BleClient.requestDevice({ services: [HR_SERVICE] })).deviceId);
+      } catch (e) {
+        if (!/no device found/i.test((e as Error).message)) throw e;
+      }
+      // 3. Nothing advertised it (some bands leave the service out of the advertisement): pick by name.
+      return remember((await BleClient.requestDevice({ optionalServices: [HR_SERVICE] })).deviceId);
+    };
+    // The plugin only connects to a device it has seen since the process started, so a remembered
+    // id must be re-registered with getDevices() first; if that or the connect fails, scan again.
+    let connected = false;
+    if (id) {
+      try {
+        const known = await BleClient.getDevices([id]);
+        if (known.length === 0) throw new Error("not registered");
+        await BleClient.connect(id, onDisconnect);
+        connected = true;
+      } catch {
+        try {
+          localStorage.removeItem(this.lastDeviceKey);
+        } catch {
+          /* ignore */
+        }
+        id = null;
+      }
+    }
+    if (!connected) {
+      id = await pick();
+      await BleClient.connect(id, onDisconnect);
+    }
+    const deviceId: string = id!;
+    this.deviceId = deviceId;
+    try {
+      await BleClient.startNotifications(deviceId, HR_SERVICE, HR_MEASUREMENT, (v) => this.emit(parseHeartRateMeasurement(v)));
+    } catch (e) {
+      // Not a heart-rate sensor after all: forget it so the next tap scans again.
+      try {
+        localStorage.removeItem(this.lastDeviceKey);
+      } catch {
+        /* ignore */
+      }
+      await BleClient.disconnect(deviceId).catch(() => {});
+      throw new Error(`That device does not expose heart rate (${(e as Error).message}). On the Fitbit Air, turn on Share heart rate → Always visible in Google Health.`);
+    }
     if (hasPlugin("SessionKeepAlive")) await KeepAlive.start({ text: "Heart rate connected" }).catch(() => {});
   }
 
