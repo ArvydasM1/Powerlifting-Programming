@@ -14,7 +14,9 @@
 }
 * { box-sizing: border-box; }
 html, body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
-body { padding-bottom: calc(64px + env(safe-area-inset-bottom)); }
+body { padding-bottom: calc(64px + env(safe-area-inset-bottom)); padding-top: env(safe-area-inset-top); }
+/* Android 15+ draws the app under the status bar (edge-to-edge); keep a solid strip there so scrolled content never sits behind the clock. */
+body::before { content: ""; position: fixed; top: 0; left: 0; right: 0; height: env(safe-area-inset-top); background: var(--bg); z-index: 20; }
 a { color: var(--accent); text-decoration: none; }
 h1 { font-size: 1.4rem; margin: 0 0 12px; }
 h2 { font-size: 1.1rem; margin: 16px 0 8px; }
@@ -54,7 +56,7 @@ input[type="number"], input[type="date"], input[type="text"], select, textarea {
 .nav a span { display: block; font-size: 1.2rem; }
 
 /* session */
-.restbar { position: sticky; top: 0; z-index: 5; background: var(--surface); border-bottom: 1px solid var(--border); padding: 10px 16px; margin: -16px -16px 12px; }
+.restbar { position: sticky; top: env(safe-area-inset-top); z-index: 5; background: var(--surface); border-bottom: 1px solid var(--border); padding: 10px 16px; margin: -16px -16px 12px; }
 .restbar .time { font-size: 2rem; font-variant-numeric: tabular-nums; font-weight: 700; }
 .restbar .time.over { color: var(--accent); }
 .restbar .bar { height: 6px; background: var(--surface-2); border-radius: 3px; overflow: hidden; margin: 6px 0; }
