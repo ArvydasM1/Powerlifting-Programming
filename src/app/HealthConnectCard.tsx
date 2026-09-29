@@ -1,7 +1,7 @@
 /** §12.5 Settings section; rendered only when the HealthConnect plugin is present. */
 import { useEffect, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
-import { DEFAULT_HC, runQueue } from "@/data/healthSync";
+import { DEFAULT_HC, enqueueAllUnsynced, runQueue } from "@/data/healthSync";
 import type { Settings } from "@/domain/types";
 import { healthConnect, healthConnectAvailable, type HcPermission } from "@/native/healthConnect";
 import { repo } from "./hooks";
@@ -46,7 +46,14 @@ export function HealthConnectCard({ settings }: { settings: Settings }) {
                 await save({ enabled: true });
                 const r = await healthConnect.requestHealthPermissions({ types: needed() });
                 setGranted(r.granted);
-                setMsg(r.granted.includes("writeExercise") ? "Health Connect connected." : "Write permission was not granted; sessions will stay queued.");
+                const s = await repo.getSettings();
+                const queued = await enqueueAllUnsynced(repo.db, s);
+                const run = await runQueue(repo.db, s);
+                setMsg(
+                  r.granted.includes("writeExercise")
+                    ? `Health Connect connected. ${queued} earlier session(s) queued; ${run.done} written now.`
+                    : "Write permission was not granted; sessions will stay queued until it is.",
+                );
               }}
             >
               Continue to permissions
@@ -75,8 +82,11 @@ export function HealthConnectCard({ settings }: { settings: Settings }) {
         </Button>
         <Button
           onClick={async () => {
-            const r = await runQueue(repo.db, await repo.getSettings());
-            setMsg(`Sync: ${r.done} done, ${r.waiting} waiting for data, ${r.failed} failed.`);
+            const s = await repo.getSettings();
+            const queued = await enqueueAllUnsynced(repo.db, s);
+            const r = await runQueue(repo.db, s);
+            const failures = await repo.db.syncQueue.where("status").equals("failed").toArray();
+            setMsg(`Sync: ${queued} newly queued, ${r.done} done, ${r.waiting} waiting for data, ${r.failed} failed.${failures[0]?.error ? ` Last error: ${failures[0].error}` : ""}`);
           }}
         >
           Sync now

@@ -36,6 +36,23 @@ export async function onSessionFinished(db: AppDB, settings: Settings, sessionId
   if (hc.readHeartRate || hc.readReadiness || hc.readWeight) await enqueue(db, sessionId, "read");
 }
 
+/** Queue a write (and read) for every finished session that has no completed write job yet. */
+export async function enqueueAllUnsynced(db: AppDB, settings: Settings): Promise<number> {
+  const hc = settings.healthConnect ?? DEFAULT_HC;
+  if (!hc.enabled) return 0;
+  const done = await db.sessions.where("status").equals("done").toArray();
+  const jobs = await db.syncQueue.toArray();
+  const written = new Set(jobs.filter((j) => j.kind === "write" && (j.status === "done" || j.status === "queued")).map((j) => j.sessionId));
+  let n = 0;
+  for (const s of done) {
+    if (written.has(s.id) || !s.startedAt || !s.finishedAt) continue;
+    await enqueue(db, s.id, "write");
+    if (hc.readHeartRate || hc.readReadiness || hc.readWeight) await enqueue(db, s.id, "read");
+    n++;
+  }
+  return n;
+}
+
 export async function onSessionDeleted(db: AppDB, settings: Settings, sessionId: string): Promise<void> {
   if (!(settings.healthConnect ?? DEFAULT_HC).enabled) return;
   await enqueue(db, sessionId, "delete");
