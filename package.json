@@ -8,7 +8,7 @@
     "build": "tsc -p tsconfig.json && vite build",
     "preview": "vite preview",
     "typecheck": "tsc -p tsconfig.json",
-    "cap:sync": "cap sync android",
+    "cap:sync": "cap sync android && node scripts/strip-sw.mjs",
     "setup-hooks": "sh scripts/setup-hooks.sh",
     "analysis:prompts": "node scripts/export-prompts.mjs"
   },

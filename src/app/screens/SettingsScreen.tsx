@@ -174,6 +174,7 @@ export function SettingsScreen() {
           </div>
         )}
       </Card>
+      <p className="small muted">Build {__BUILD_ID__}</p>
     </div>
   );
 }
