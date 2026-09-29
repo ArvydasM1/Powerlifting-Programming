@@ -42,7 +42,13 @@ export function HeartRateButton({ state }: { state: HeartRateState }) {
             if (connected) await heartRate.disconnect();
             else await heartRate.connect();
           } catch (e) {
-            if ((e as Error).name !== "NotFoundError") setError((e as Error).message);
+            const err = e as Error;
+            const notFound = err.name === "NotFoundError" || /no device|not found|cancel/i.test(err.message);
+            setError(
+              notFound
+                ? "No heart-rate broadcast found. The sensor must advertise the standard Bluetooth heart-rate service; on a Fitbit that means turning on heart-rate broadcast (in the device's Exercise settings) during a workout, and not every Fitbit offers it. Without a broadcast, heart rate is read from Health Connect after the session instead."
+                : err.message,
+            );
           }
         }}
       >
