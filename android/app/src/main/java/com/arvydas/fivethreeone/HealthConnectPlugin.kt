@@ -76,8 +76,8 @@ class HealthConnectPlugin : Plugin() {
             try {
                 val granted = client().permissionController.getGrantedPermissions()
                 call.resolve(JSObject().put("granted", JSArray(granted.mapNotNull { keyFor(it) })))
-            } catch (e: Exception) {
-                call.reject(e.message ?: "getGranted failed")
+            } catch (e: Throwable) {
+                call.reject("getGranted: ${e.message ?: e.javaClass.simpleName}")
             }
         }
     }
@@ -119,18 +119,34 @@ class HealthConnectPlugin : Plugin() {
 
     @PluginMethod
     fun writeSession(call: PluginCall) {
-        val clientId = call.getString("clientId") ?: return call.reject("clientId required")
-        val start = Instant.ofEpochMilli(call.getLong("startMs") ?: return call.reject("startMs required"))
-        val end = Instant.ofEpochMilli(call.getLong("endMs") ?: return call.reject("endMs required"))
-        val title = call.getString("title")
-        val notes = call.getString("notes")
-        val zone = ZoneId.systemDefault().rules.getOffset(start) as ZoneOffset
+        // Everything before the coroutine runs on the bridge thread, where an uncaught exception kills the process.
+        val clientId: String
+        val start: Instant
+        val end: Instant
+        val title: String?
+        val notes: String?
+        val zone: ZoneOffset
         val segments = mutableListOf<ExerciseSegment>()
-        call.getArray("segments")?.toList<JSObject>()?.forEach { s ->
-            val sStart = Instant.ofEpochMilli(s.getLong("startMs"))
-            val sEnd = Instant.ofEpochMilli(s.getLong("endMs"))
-            if (!sEnd.isAfter(sStart)) return@forEach
-            segments.add(ExerciseSegment(sStart, sEnd, segmentType(s.getString("type") ?: "weightlifting"), s.getInteger("reps") ?: 0))
+        try {
+            clientId = call.getString("clientId") ?: return call.reject("clientId required")
+            start = Instant.ofEpochMilli(call.getLong("startMs") ?: return call.reject("startMs required"))
+            end = Instant.ofEpochMilli(call.getLong("endMs") ?: return call.reject("endMs required"))
+            title = call.getString("title")
+            notes = call.getString("notes")
+            zone = ZoneId.systemDefault().rules.getOffset(start)
+            // Nested objects in a JSArray are plain org.json.JSONObject, not JSObject; a generic toList() cast throws.
+            val arr = call.getArray("segments")
+            if (arr != null) {
+                for (i in 0 until arr.length()) {
+                    val s = arr.getJSONObject(i)
+                    val sStart = Instant.ofEpochMilli(s.getLong("startMs"))
+                    val sEnd = Instant.ofEpochMilli(s.getLong("endMs"))
+                    if (!sEnd.isAfter(sStart)) continue
+                    segments.add(ExerciseSegment(sStart, sEnd, segmentType(s.optString("type", "weightlifting")), s.optInt("reps", 0)))
+                }
+            }
+        } catch (e: Throwable) {
+            return call.reject("writeSession arguments: ${e.message ?: e.javaClass.simpleName}")
         }
         scope.launch {
             try {
@@ -150,8 +166,8 @@ class HealthConnectPlugin : Plugin() {
                 )
                 c.insertRecords(listOf(record))
                 call.resolve()
-            } catch (e: Exception) {
-                call.reject(e.message ?: "writeSession failed")
+            } catch (e: Throwable) {
+                call.reject("writeSession: ${e.message ?: e.javaClass.simpleName}")
             }
         }
     }
@@ -163,8 +179,8 @@ class HealthConnectPlugin : Plugin() {
             try {
                 client().deleteRecords(ExerciseSessionRecord::class, recordIdsList = emptyList(), clientRecordIdsList = listOf(clientId))
                 call.resolve()
-            } catch (e: Exception) {
-                call.reject(e.message ?: "deleteSession failed")
+            } catch (e: Throwable) {
+                call.reject("deleteSession: ${e.message ?: e.javaClass.simpleName}")
             }
         }
     }
@@ -184,8 +200,8 @@ class HealthConnectPlugin : Plugin() {
                     }
                 }
                 call.resolve(JSObject().put("samples", arr))
-            } catch (e: Exception) {
-                call.reject(e.message ?: "readHeartRate failed")
+            } catch (e: Throwable) {
+                call.reject("readHeartRate: ${e.message ?: e.javaClass.simpleName}")
             }
         }
     }
@@ -220,8 +236,8 @@ class HealthConnectPlugin : Plugin() {
                     c.readRecords(ReadRecordsRequest(WeightRecord::class, range)).records.lastOrNull()
                 }.getOrNull()?.let { ret.put("weightKg", it.weight.inKilograms) }
                 call.resolve(ret)
-            } catch (e: Exception) {
-                call.reject(e.message ?: "readDaily failed")
+            } catch (e: Throwable) {
+                call.reject("readDaily: ${e.message ?: e.javaClass.simpleName}")
             }
         }
     }
