@@ -56,9 +56,10 @@ export function HistoryScreen() {
                   <Link to={`/session/${s.id}`}>{s.plannedLabel.split(" · ").slice(-1)[0]}</Link>
                   <div className="muted small">
                     {s.phaseName} {s.status === "backfilled" ? "· backfilled" : ""} {prs ? `· ${prs} PR` : ""}
-                    {sync?.get(s.id) === "done" && " · synced"}
-                    {sync?.get(s.id) === "queued" && " · sync queued"}
-                    {sync?.get(s.id) === "failed" && " · sync failed"}
+                    {sync?.get(s.id)?.status === "done" && " · synced"}
+                    {sync?.get(s.id)?.status === "queued" && " · sync queued"}
+                    {sync?.get(s.id)?.status === "failed" && ` · sync failed: ${sync.get(s.id)?.error ?? ""}`}
+                    {sync?.get(s.id)?.status === "skipped" && ` · not synced: ${sync.get(s.id)?.error ?? ""}`}
                   </div>
                 </td>
                 <td className="num">

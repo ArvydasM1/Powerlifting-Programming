@@ -15,6 +15,7 @@ export function HealthConnectCard({ settings }: { settings: Settings }) {
   const [explain, setExplain] = useState(false);
   const queued = useLiveQuery(() => repo.db.syncQueue.where("status").equals("queued").count(), []);
   const failed = useLiveQuery(() => repo.db.syncQueue.where("status").equals("failed").count(), []);
+  const written = useLiveQuery(() => repo.db.syncQueue.filter((j) => j.kind === "write" && j.status === "done").count(), []);
 
   useEffect(() => {
     healthConnect.isAvailable().then((r) => setStatus(r.status));
@@ -29,7 +30,7 @@ export function HealthConnectCard({ settings }: { settings: Settings }) {
     <Card>
       <h3>Health Connect</h3>
       <p className="small muted">
-        Status: {status} · granted: {granted.length ? granted.join(", ") : "none"} · queued {queued ?? 0} · failed {failed ?? 0}
+        Status: {status} · granted: {granted.length ? granted.join(", ") : "none"} · written {written ?? 0} · queued {queued ?? 0} · failed {failed ?? 0}
       </p>
       {msg && <div className="banner small">{msg}</div>}
       <Toggle label="Sync finished sessions to Health Connect" checked={hc.enabled} onChange={(v) => (v ? setExplain(true) : save({ enabled: false }))} help="One exercise session per finished session, one segment per set with reps. No weights." />
@@ -85,8 +86,9 @@ export function HealthConnectCard({ settings }: { settings: Settings }) {
             const s = await repo.getSettings();
             const queued = await enqueueAllUnsynced(repo.db, s);
             const r = await runQueue(repo.db, s);
-            const failures = await repo.db.syncQueue.where("status").equals("failed").toArray();
-            setMsg(`Sync: ${queued} newly queued, ${r.done} done, ${r.waiting} waiting for data, ${r.failed} failed.${failures[0]?.error ? ` Last error: ${failures[0].error}` : ""}`);
+            const notes = await repo.db.syncQueue.where("status").anyOf(["failed", "skipped"]).toArray();
+            const last = notes.at(-1);
+            setMsg(`Sync: ${queued} newly queued, ${r.done} written, ${r.skipped} skipped, ${r.waiting} waiting for data, ${r.failed} failed.${last?.error ? ` Last note: ${last.error}` : ""}`);
           }}
         >
           Sync now

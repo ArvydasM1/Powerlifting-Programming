@@ -42,7 +42,7 @@ export async function enqueueAllUnsynced(db: AppDB, settings: Settings): Promise
   if (!hc.enabled) return 0;
   const done = await db.sessions.where("status").equals("done").toArray();
   const jobs = await db.syncQueue.toArray();
-  const written = new Set(jobs.filter((j) => j.kind === "write" && (j.status === "done" || j.status === "queued")).map((j) => j.sessionId));
+  const written = new Set(jobs.filter((j) => j.kind === "write" && j.status !== "failed").map((j) => j.sessionId));
   let n = 0;
   for (const s of done) {
     if (written.has(s.id) || !s.startedAt || !s.finishedAt) continue;
@@ -58,11 +58,19 @@ export async function onSessionDeleted(db: AppDB, settings: Settings, sessionId:
   await enqueue(db, sessionId, "delete");
 }
 
-/** Build the Health Connect payload for a session (§12.3). Only sessions with a logged main-lift set qualify. */
+/** Why a session cannot be written, or null when it can. */
+export function writeSkipReason(session: Session, sets: WorkoutSet[]): string | null {
+  if (!session.startedAt || !session.finishedAt) return "session has no start/finish time (backfilled?)";
+  const logged = sets.filter((s) => s.completedAt && !s.backfilled);
+  if (logged.length === 0) return "no sets were logged with the done tap";
+  if (!logged.some((s) => s.blockType === "main" || s.blockType === "supplemental")) return "only assistance sets were logged";
+  return null;
+}
+
+/** Build the Health Connect payload for a session (§12.3). Sessions with at least one logged barbell set qualify. */
 export function buildWritePayload(session: Session, sets: WorkoutSet[]) {
-  if (!session.startedAt || !session.finishedAt) return null;
+  if (writeSkipReason(session, sets) || !session.startedAt || !session.finishedAt) return null;
   const logged = sets.filter((s) => s.completedAt && !s.backfilled).sort((a, b) => Date.parse(a.completedAt!) - Date.parse(b.completedAt!));
-  if (!logged.some((s) => s.blockType === "main")) return null;
   const startMs = Date.parse(session.startedAt);
   const segments = logged.map((s, i) => {
     const endMs = Date.parse(s.completedAt!);
@@ -75,9 +83,9 @@ export function buildWritePayload(session: Session, sets: WorkoutSet[]) {
 }
 
 /** Run every queued job once. Returns counts for the UI. */
-export async function runQueue(db: AppDB, settings: Settings): Promise<{ done: number; failed: number; waiting: number }> {
+export async function runQueue(db: AppDB, settings: Settings): Promise<{ done: number; failed: number; waiting: number; skipped: number }> {
   const hc = settings.healthConnect ?? DEFAULT_HC;
-  const result = { done: 0, failed: 0, waiting: 0 };
+  const result = { done: 0, failed: 0, waiting: 0, skipped: 0 };
   if (!hc.enabled || !healthConnectAvailable()) return result;
   const jobs = await db.syncQueue.where("status").equals("queued").toArray();
   for (const job of jobs) {
@@ -86,8 +94,14 @@ export async function runQueue(db: AppDB, settings: Settings): Promise<{ done: n
       if (job.kind === "write") {
         const session = await db.sessions.get(job.sessionId);
         if (!session) throw new Error("session missing");
-        const payload = buildWritePayload(session, await db.sets.where("sessionId").equals(job.sessionId).toArray());
-        if (payload) await healthConnect.writeSession(payload);
+        const sets = await db.sets.where("sessionId").equals(job.sessionId).toArray();
+        const skip = writeSkipReason(session, sets);
+        if (skip) {
+          await db.syncQueue.update(job.id!, { status: "skipped", lastTriedAt: now, error: skip });
+          result.skipped++;
+          continue;
+        }
+        await healthConnect.writeSession(buildWritePayload(session, sets)!);
         await db.syncQueue.update(job.id!, { status: "done", lastTriedAt: now, error: null });
         result.done++;
       } else if (job.kind === "delete") {
@@ -159,13 +173,17 @@ export async function readVitals(db: AppDB, hc: HealthConnectSettings, sessionId
   return foundHr;
 }
 
-export async function queueStatus(db: AppDB): Promise<Map<string, SyncJob["status"]>> {
-  const jobs = await db.syncQueue.toArray();
-  const m = new Map<string, SyncJob["status"]>();
+export async function queueStatus(db: AppDB): Promise<Map<string, { status: SyncJob["status"]; error: string | null }>> {
+  const jobs = (await db.syncQueue.toArray()).sort((a, b) => (a.id ?? 0) - (b.id ?? 0));
+  const m = new Map<string, { status: SyncJob["status"]; error: string | null }>();
   for (const j of jobs) {
     if (j.kind !== "write") continue;
-    const cur = m.get(j.sessionId);
-    if (!cur || j.status === "failed" || (j.status === "queued" && cur === "done")) m.set(j.sessionId, j.status);
+    m.set(j.sessionId, { status: j.status, error: j.error }); // latest write job wins
   }
   return m;
+}
+
+/** Wipe skipped/failed write jobs so they are retried (e.g. after logging more sets). */
+export async function resetWriteJobs(db: AppDB, sessionId: string): Promise<void> {
+  await db.syncQueue.where("sessionId").equals(sessionId).filter((j) => j.kind === "write" && j.status !== "done").delete();
 }

@@ -213,7 +213,7 @@ export interface SyncJob {
   id?: number;
   sessionId: string;
   kind: "write" | "delete" | "read";
-  status: "queued" | "done" | "failed";
+  status: "queued" | "done" | "failed" | "skipped";
   createdAt: string;
   lastTriedAt: string | null;
   error: string | null;
