@@ -45,11 +45,18 @@ function Root() {
         return;
       }
       setMode("normal");
-      // The app counts as healthy once it has stayed up for a while.
-      setTimeout(() => {
-        crumb("healthy");
+      // The app counts as healthy once it has stayed up briefly (a start-up crash happens within a second),
+      // or as soon as the lifter backgrounds or closes it deliberately: a crash never fires visibilitychange.
+      let done = false;
+      const healthy = (why: string) => {
+        if (done) return;
+        done = true;
+        crumb(`healthy (${why})`);
         void markHealthy();
-      }, 8000);
+      };
+      setTimeout(() => healthy("uptime"), 3000);
+      document.addEventListener("visibilitychange", () => document.visibilityState === "hidden" && healthy("hidden"));
+      window.addEventListener("pagehide", () => healthy("pagehide"));
     })();
   }, []);
   if (mode === "checking") return <div className="screen">Starting…</div>;
