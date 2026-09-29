@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <!-- Health Connect (SPEC.md §12.2): package query so the app can detect the provider on Android 13 and lower -->
     <queries>
@@ -88,6 +89,12 @@
     <uses-permission android:name="android.permission.health.READ_HEART_RATE_VARIABILITY" />
     <uses-permission android:name="android.permission.health.READ_SLEEP" />
     <uses-permission android:name="android.permission.health.READ_WEIGHT" />
-    <!-- Bluetooth LE heart rate (§13); the bluetooth-le plugin declares BLUETOOTH_SCAN/CONNECT -->
+    <!-- Bluetooth LE heart rate (§13). Scan results are only delivered on Android 12+ when the app either
+         holds location permission or asserts the scan is never used for location; we assert the latter,
+         replacing the plugin's own declaration, and drop the location permissions on 12+. -->
+    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" android:usesPermissionFlags="neverForLocation" tools:targetApi="s" tools:node="replace" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" tools:targetApi="s" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" android:maxSdkVersion="30" tools:node="replace" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" android:maxSdkVersion="30" tools:node="replace" />
     <uses-feature android:name="android.hardware.bluetooth_le" android:required="false" />
 </manifest>
