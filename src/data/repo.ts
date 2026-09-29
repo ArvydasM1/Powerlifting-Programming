@@ -249,9 +249,10 @@ export function createRepo(db: AppDB = defaultDb, clock: Clock = systemClock) {
     const set = await db.sets.get(setId);
     if (!set) return;
     if (set.completedAt) {
-      // re-evaluate PR flags with new values, keep timestamps
+      // re-evaluate PR flags with new values, keep timestamps. Settings are read before the
+      // transaction: reading a table the transaction does not cover aborts it (NotFoundError).
+      const settings = await getSettings();
       await db.transaction("rw", db.sets, db.prRecords, db.sessions, db.exercises, async () => {
-        const settings = await getSettings();
         const actualWeight = values.actualWeight === undefined ? set.actualWeight : values.actualWeight;
         const actualReps = values.actualReps ?? set.actualReps ?? 0;
         const target = parseRepTarget(set.prescribedReps);

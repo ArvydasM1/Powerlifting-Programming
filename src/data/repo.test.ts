@@ -73,6 +73,17 @@ describe("repo", () => {
     expect(top.isE1rmPR).toBe(true);
     expect((await repo.prHistory("Bench")).map((p) => [p.weight, p.reps, p.e1rm])).toEqual([[80, 10, 107.5]]);
 
+    // editing a logged set (the ± buttons) must persist and re-evaluate the PR
+    await repo.updateSetValues(bench[2]!.id, { actualWeight: 82.5 });
+    await repo.updateSetValues(bench[2]!.id, { actualReps: 11 });
+    const edited = (await repo.db.sets.get(bench[2]!.id))!;
+    expect([edited.actualWeight, edited.actualReps, edited.completedAt]).toEqual([82.5, 11, top.completedAt]);
+    expect((await repo.prHistory("Bench")).map((p) => [p.weight, p.reps])).toEqual([[82.5, 11]]);
+    // and editing a set before it is logged just stores the values for the tap to use
+    await repo.updateSetValues(squat[2]!.id, { actualWeight: 120 });
+    clock.advance(100);
+    expect((await repo.logSet(squat[2]!.id)).actualWeight).toBe(120);
+
     const session = (await repo.db.sessions.get(next.id))!;
     expect(session.status).toBe("inProgress");
     const r = await repo.finishSession(next.id);
