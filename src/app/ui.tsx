@@ -88,13 +88,32 @@ export function NumberField({
   );
 }
 
+/** ± buttons around a value that can also be typed directly (decimal keyboard on phones). */
 export function Stepper({ value, onChange, step, min = 0, format }: { value: number; onChange: (v: number) => void; step: number; min?: number; format?: (v: number) => string }) {
+  const [text, setText] = useState<string | null>(null);
+  const commit = () => {
+    if (text === null) return;
+    const v = Number(text.replace(",", "."));
+    if (text.trim() !== "" && Number.isFinite(v)) onChange(Math.max(min, v));
+    setText(null);
+  };
   return (
     <div className="stepper">
       <button type="button" onClick={() => onChange(Math.max(min, Number((value - step).toFixed(3))))}>
         −
       </button>
-      <span>{format ? format(value) : value}</span>
+      <input
+        type="text"
+        inputMode="decimal"
+        value={text ?? (format ? format(value) : String(value))}
+        onFocus={(e) => {
+          setText(String(value));
+          e.target.select();
+        }}
+        onChange={(e) => setText(e.target.value)}
+        onBlur={commit}
+        onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
+      />
       <button type="button" onClick={() => onChange(Number((value + step).toFixed(3)))}>
         +
       </button>

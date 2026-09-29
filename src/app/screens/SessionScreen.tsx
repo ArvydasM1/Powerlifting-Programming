@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { parseRepTarget, warmupSets, formatRest } from "@/domain/calc";
+import { buildSequence } from "@/domain/sequence";
 import type { SetGroup, WorkoutSet } from "@/domain/types";
 import { keepAwake } from "@/native/bridge";
 import { sessionText, shareFileName, textToPngBlob } from "@/data/share";
@@ -45,10 +46,10 @@ export function SessionScreen() {
     return data.sets.filter((s) => s.completedAt).map((s) => s.completedAt!).sort().at(-1) ?? null;
   }, [data]);
 
-  const nextSet = useMemo(() => {
-    if (!data) return null;
-    return data.sets.find((s) => !s.completedAt && !s.optional) ?? data.sets.find((s) => !s.completedAt) ?? null;
-  }, [data]);
+  // Execution order: barbell sets with superset assistance slotted between them (§6.9).
+  const isOpen = (g: SetGroup) => !g.optional || !!openOptional[g.id] || (data?.sets.some((s) => s.groupId === g.id && (s.completedAt || s.backfilled)) ?? false);
+  const sequence = useMemo(() => (data ? buildSequence(data.groups, data.sets, isOpen) : []), [data, openOptional]); // eslint-disable-line react-hooks/exhaustive-deps
+  const nextSet = useMemo(() => sequence.find((r) => !r.set.completedAt)?.set ?? null, [sequence]);
 
   if (!data || !settings) return <div className="screen">Loading…</div>;
   const { session, groups, sets } = data;
@@ -148,72 +149,78 @@ export function SessionScreen() {
         </Card>
       )}
 
-      {groups.map((g) => {
-        const gs = groupSets(g);
-        const collapsed = g.optional && !openOptional[g.id] && gs.every((s) => !s.completedAt);
-        const doneReps = gs.reduce((a, s) => a + (s.actualReps ?? 0), 0);
-        const targetReps = gs.reduce((a, s) => a + parseRepTarget(s.prescribedReps).min, 0);
-        return (
-          <div className="group" key={g.id}>
-            <div className="group-title">
-              <b>
+      {groups.some((g) => g.optional) && (
+        <div className="row small" style={{ flexWrap: "wrap", gap: 6, marginTop: 8 }}>
+          {groups
+            .filter((g) => g.optional)
+            .map((g) => (
+              <Button key={g.id} kind={isOpen(g) ? "default" : "ghost"} onClick={() => setOpenOptional({ ...openOptional, [g.id]: !isOpen(g) })}>
+                {isOpen(g) ? "✓ " : "+ "}
                 {g.label}
-                {g.superset && <span className="muted small"> · superset</span>}
-              </b>
-              {g.type === "assistance" && (
-                <span className="muted small">
-                  {doneReps}/{targetReps} reps
-                </span>
-              )}
-              {g.optional && (
-                <Button kind="ghost" onClick={() => setOpenOptional({ ...openOptional, [g.id]: !openOptional[g.id] })}>
-                  {collapsed ? "show" : "hide"}
-                </Button>
+              </Button>
+            ))}
+        </div>
+      )}
+
+      {sequence.map(({ set: s, group: g, first }) => {
+        const gs = groupSets(g);
+        const doneReps = gs.reduce((a, x) => a + (x.actualReps ?? 0), 0);
+        const targetReps = gs.reduce((a, x) => a + parseRepTarget(x.prescribedReps).min, 0);
+        const isNext = nextSet?.id === s.id && live;
+        return (
+          <div key={s.id}>
+            {first && (
+              <div className="group-title" style={{ marginTop: 12 }}>
+                <b>
+                  {g.label}
+                  {g.superset && <span className="muted small"> · superset</span>}
+                </b>
+                {g.type === "assistance" && (
+                  <span className="muted small">
+                    {doneReps}/{targetReps} reps
+                  </span>
+                )}
+              </div>
+            )}
+            <div className={`setrow ${s.completedAt || s.backfilled ? "done" : ""} ${s.optional ? "optional" : ""} ${isNext ? "next" : ""}`}>
+              <div className="main" role={readOnly ? undefined : "button"} onClick={() => !readOnly && setEditing(editing === s.id ? null : s.id)}>
+                <div className="presc">
+                  {s.prescribedWeight !== null ? `${s.prescribedWeight} × ` : ""}
+                  {s.prescribedReps}
+                  {!s.completedAt && s.actualWeight !== null && s.actualWeight !== s.prescribedWeight && <span className="muted small"> · will log {s.actualWeight}</span>}
+                  {s.note && <span className="muted small"> · {s.note}</span>}
+                  {s.isRepPR && <span className="pr">PR</span>}
+                  {!s.isRepPR && s.isE1rmPR && <span className="pr">e1RM PR</span>}
+                </div>
+                {(s.completedAt || s.backfilled) && (
+                  <div className="actual">
+                    did {s.actualWeight ?? "—"} × {s.actualReps ?? "—"}
+                    {s.actualRestSec !== null && ` · ${formatRest(s.actualRestSec)} since last set`}
+                    {perSet.get(s.id)?.hrAtDone != null && ` · ♥ ${perSet.get(s.id)!.hrAtDone} → ${perSet.get(s.id)!.hrMinBeforeNext ?? "—"}`}
+                  </div>
+                )}
+              </div>
+              {!readOnly && (
+                <button className="donebtn" onClick={() => onDone(s)} aria-label={s.completedAt ? "edit set" : "mark set done"}>
+                  {s.completedAt ? "✓" : ""}
+                </button>
               )}
             </div>
-            {!collapsed &&
-              gs.map((s) => (
-                <div key={s.id}>
-                  <div className={`setrow ${s.completedAt || s.backfilled ? "done" : ""} ${s.optional ? "optional" : ""}`}>
-                    <div className="main">
-                      <div className="presc">
-                        {s.prescribedWeight !== null ? `${s.prescribedWeight} × ` : ""}
-                        {s.prescribedReps}
-                        {s.note && <span className="muted small"> · {s.note}</span>}
-                        {s.isRepPR && <span className="pr">PR</span>}
-                        {!s.isRepPR && s.isE1rmPR && <span className="pr">e1RM PR</span>}
-                      </div>
-                      {(s.completedAt || s.backfilled) && (
-                        <div className="actual">
-                          did {s.actualWeight ?? "—"} × {s.actualReps ?? "—"}
-                          {s.actualRestSec !== null && ` · ${formatRest(s.actualRestSec)} since last set`}
-                          {perSet.get(s.id)?.hrAtDone != null && ` · ♥ ${perSet.get(s.id)!.hrAtDone} → ${perSet.get(s.id)!.hrMinBeforeNext ?? "—"}`}
-                        </div>
-                      )}
-                    </div>
-                    {!readOnly && (
-                      <button className="donebtn" onClick={() => onDone(s)} aria-label={s.completedAt ? "edit set" : "mark set done"}>
-                        {s.completedAt ? "✓" : ""}
-                      </button>
-                    )}
-                  </div>
-                  {editing === s.id && !readOnly && (
-                    <div className="editor">
-                      <label>
-                        weight
-                        <Stepper value={s.actualWeight ?? s.prescribedWeight ?? 0} step={settings.roundingStep} onChange={(v) => repo.updateSetValues(s.id, { actualWeight: v })} />
-                      </label>
-                      <label>
-                        reps
-                        <Stepper value={s.actualReps ?? 0} step={1} onChange={(v) => repo.updateSetValues(s.id, { actualReps: v })} />
-                      </label>
-                      <Button kind="ghost" onClick={() => setEditing(null)}>
-                        ok
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              ))}
+            {editing === s.id && !readOnly && (
+              <div className="editor">
+                <label>
+                  weight
+                  <Stepper value={s.actualWeight ?? s.prescribedWeight ?? 0} step={settings.roundingStep} onChange={(v) => repo.updateSetValues(s.id, { actualWeight: v })} />
+                </label>
+                <label>
+                  reps
+                  <Stepper value={s.actualReps ?? (s.completedAt ? 0 : parseRepTarget(s.prescribedReps).min)} step={1} onChange={(v) => repo.updateSetValues(s.id, { actualReps: v })} />
+                </label>
+                <Button kind="ghost" onClick={() => setEditing(null)}>
+                  ok
+                </Button>
+              </div>
+            )}
           </div>
         );
       })}
